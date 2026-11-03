@@ -4,8 +4,14 @@ import { bookVisit } from "../lib/booking";
 import { db, pool } from "./index";
 import { leads, projects, slots, users, visits } from "./schema";
 
-// Demo-only credentials, also listed in deployment.md. All people and numbers here are made up.
-const DEMO_PASSWORD = "demo-sitevisit-2026";
+// The seed wipes every table, so it needs an explicit go-ahead on anything but a local database.
+const { hostname } = new URL(process.env.DATABASE_URL!);
+if (!["localhost", "127.0.0.1"].includes(hostname) && process.env.ALLOW_SEED_RESET !== "yes") {
+  throw new Error(`Refusing to wipe ${hostname}. Set ALLOW_SEED_RESET=yes if this is a demo database.`);
+}
+// All people and numbers in this file are made up.
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD;
+if (!DEMO_PASSWORD) throw new Error("Set DEMO_PASSWORD");
 const DAY = 24 * 60 * 60 * 1000;
 const IST_OFFSET = 5.5 * 60 * 60 * 1000;
 const VISIT_HOURS = [10, 11, 12, 14, 15, 16, 17];
@@ -145,6 +151,7 @@ const inserted = await db.insert(leads).values(generated).returning();
 
 // About a third have a past visit, and a few have upcoming ones booked through the real booking code.
 for (const lead of inserted) {
+  if (!lead.firstResponseAt) continue; // Nobody has replied to this lead, so no visit could exist.
   const roll = random();
   if (roll < 0.25) {
     await db.insert(visits).values({
@@ -160,4 +167,3 @@ for (const lead of inserted) {
 
 await pool.end();
 console.log(`Seeded ${staff.length} staff, ${inserted.length + 3} leads, ${slotRows.length} slots`);
-console.log(`Demo sign-in: head@companya.example or riya@companya.example / ${DEMO_PASSWORD}`);
