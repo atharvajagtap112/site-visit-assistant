@@ -113,6 +113,48 @@ export const visits = pgTable(
   ],
 );
 
+/** What the assistant is allowed to say. Edited by the sales head; a project-less fact applies to both. */
+export const facts = pgTable("facts", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  projectId: integer("project_id").references(() => projects.id),
+  topic: text().notNull(),
+  content: text().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const conversations = pgTable("conversations", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  // The buyer's cookie holds the raw token; only its hash is stored, as with staff sessions.
+  tokenHash: text("token_hash").notNull().unique(),
+  leadId: integer("lead_id")
+    .notNull()
+    .references(() => leads.id),
+  handedOffAt: timestamp("handed_off_at", { withTimezone: true }),
+  handoffReason: text("handoff_reason"),
+  summary: text(),
+  flaggedAt: timestamp("flagged_at", { withTimezone: true }),
+  flagReason: text("flag_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const chatRoleEnum = pgEnum("chat_role", ["buyer", "assistant"]);
+
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    conversationId: integer("conversation_id")
+      .notNull()
+      .references(() => conversations.id),
+    role: chatRoleEnum().notNull(),
+    content: text().notNull(),
+    // What the model wrote before the safety check replaced it. Staff-only, for the daily review.
+    blockedDraft: text("blocked_draft"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("chat_messages_conversation_idx").on(t.conversationId)],
+);
+
 // Simulated outbox: messages are recorded here and shown to staff, never really sent.
 export const messages = pgTable("messages", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
