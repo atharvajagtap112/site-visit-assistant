@@ -30,7 +30,7 @@ const LETTER_AFTER = String.raw`(?![\p{L}\p{M}])`;
 
 const DISCOUNT_PATTERNS = [
   /discount|waiv|rebate|concession|cashback|negotiat|bargain/i,
-  /(best|lowest|lower|reduced?|special|final|all[\s-]*inclusive)[\s-]+(\w+[\s-]+)?(price|prices|cost|rate|deal|offer|amount)/i,
+  /(offer|best|lowest|lower|reduced?|special|final|all[\s-]*inclusive)[\s-]+(\w+[\s-]+)?(price|prices|cost|rate|deal|offer|amount)/i,
   /(reduce|lower|cut)\s+(\w+\s+)?(price|cost)/i,
   /छूट|छुट|डिस्काउंट|डिसकाउंट|रियायत|मोलभाव|कैशबैक|ऑफर|अंतिम\s*(कीमत|दाम|मूल्य)|फाइनल\s*(कीमत|प्राइस|दाम)|कम\s*(कीमत|दाम)|(कीमत|दाम)\s*कम/,
   /છૂટ|છુટ|ડિસ્કાઉન્ટ|ડિસ્કાઉંટ|રાહત|ભાવતાલ|કેશબેક|ઓફર|અંતિમ\s*(કિંમત|ભાવ)|ફાઇનલ\s*(કિંમત|ભાવ|પ્રાઇસ)|ઓછી\s*કિંમત|ઓછા\s*ભાવ|(કિંમત|ભાવ)\s*ઓછ/,

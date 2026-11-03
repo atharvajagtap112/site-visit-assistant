@@ -166,3 +166,40 @@ describe("normalise", () => {
     expect(normalise("a​b")).toBe("ab");
   });
 });
+
+describe("more wording", () => {
+  it.each([
+    "We can negotiate.",
+    "A waiver of the fee.",
+    "We can waive it.",
+    "Cashback is available.",
+    "This is the offer price.",
+    "This is the final price.",
+    "रियायत मिलेगी।",
+    "मोलभाव हो सकता है।",
+    "यह अंतिम कीमत है।",
+    "છૂટ મળશે.",
+    "રાહત મળશે.",
+    "ભાવતાલ થશે.",
+  ])("blocks discount wording: %s", (reply) => {
+    expect(checkReply(reply, FACTS)).toBe("discount");
+  });
+
+  it.each(["Rs 2 down.", "INR 2 down.", "2 rupees down.", "2 crore.", "2 cr."])(
+    "treats %s as money",
+    (reply) => {
+      expect(checkReply(reply, FACTS)).toBe("unsupported_price");
+    },
+  );
+
+  it("handles amounts written with Indian commas", () => {
+    const facts = "From ₹65,00,000.";
+    expect(checkReply("₹65,00,000 onwards.", facts)).toBeNull();
+    expect(checkReply("₹65,50,000 onwards.", facts)).toBe("unsupported_price");
+    expect(checkReply("We have 1,200 homes.", "1200 homes.")).toBeNull();
+  });
+
+  it("normalises digits in tool output", () => {
+    expect(checkReply("Free on 8 Nov.", FACTS, "૮ Nov")).toBeNull();
+  });
+});

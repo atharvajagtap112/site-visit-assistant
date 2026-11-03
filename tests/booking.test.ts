@@ -11,7 +11,7 @@ const failure = (result: Awaited<ReturnType<typeof bookVisit>>) =>
   result.ok ? "booked" : result.reason;
 
 describe("double booking", () => {
-  it("lets exactly one of 20 simultaneous buyers take a slot", async () => {
+  it("lets exactly one of 20 buyers take a slot, with up to 10 racing at once", async () => {
     const project = await makeProject();
     const slot = await makeSlot(project.id);
     const buyers = await Promise.all(Array.from({ length: 20 }, () => makeLead()));
