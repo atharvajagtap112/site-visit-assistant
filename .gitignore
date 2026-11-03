@@ -7,3 +7,4 @@ next-env.d.ts
 !.env.example
 New Text Document.txt
 .playwright-mcp/
+.claude/

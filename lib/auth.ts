@@ -30,7 +30,7 @@ export async function checkCredentials(email: string, password: string) {
   return user && valid ? user : null;
 }
 
-const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 /** The token goes in the cookie; only its hash is stored, so a database leak exposes no sessions. */
 export async function createSession(userId: number) {

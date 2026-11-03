@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { leads, messages, slots, visits } from "../db/schema";
 
@@ -42,6 +42,18 @@ export async function getFreeSlots(projectId: number, limit = 12) {
     .limit(limit);
 }
 
+/** An opt-out belongs to the person, so it also covers duplicate leads with the same phone. */
+async function isOptedOut(tx: Tx, lead: typeof leads.$inferSelect) {
+  if (lead.optedOutAt) return true;
+  if (!lead.phone) return false;
+  const [other] = await tx
+    .select({ id: leads.id })
+    .from(leads)
+    .where(and(eq(leads.phone, lead.phone), isNotNull(leads.optedOutAt)))
+    .limit(1);
+  return Boolean(other);
+}
+
 async function bookInTx(tx: Tx, slotId: number, leadId: number): Promise<BookingResult> {
   const [slot] = await tx.select().from(slots).where(eq(slots.id, slotId));
   if (!slot || !slot.isOpen || slot.startsAt <= new Date()) {
@@ -50,7 +62,7 @@ async function bookInTx(tx: Tx, slotId: number, leadId: number): Promise<Booking
 
   const [lead] = await tx.select().from(leads).where(eq(leads.id, leadId));
   if (!lead) return { ok: false, reason: "lead_not_found" };
-  if (lead.optedOutAt) return { ok: false, reason: "opted_out" };
+  if (await isOptedOut(tx, lead)) return { ok: false, reason: "opted_out" };
   if (!lead.consentAt) return { ok: false, reason: "no_consent" };
 
   // The partial unique indexes decide the winner. A concurrent insert waits for the
@@ -67,6 +79,11 @@ async function bookInTx(tx: Tx, slotId: number, leadId: number): Promise<Booking
       .from(visits)
       .where(and(eq(visits.leadId, leadId), eq(visits.status, "booked")));
     return { ok: false, reason: mine ? "already_booked" : "slot_taken" };
+  }
+
+  // Buyers can change their mind about which project to see, so the lead follows the booking.
+  if (lead.projectId !== slot.projectId) {
+    await tx.update(leads).set({ projectId: slot.projectId }).where(eq(leads.id, leadId));
   }
 
   const now = Date.now();
@@ -90,10 +107,19 @@ export function bookVisit(slotId: number, leadId: number): Promise<BookingResult
 }
 
 async function cancelInTx(tx: Tx, visitId: number) {
+  // A visit whose time has passed needs a show-up record from staff, not a cancellation.
   const [visit] = await tx
     .update(visits)
     .set({ status: "cancelled" })
-    .where(and(eq(visits.id, visitId), eq(visits.status, "booked")))
+    .from(slots)
+    .where(
+      and(
+        eq(visits.id, visitId),
+        eq(visits.status, "booked"),
+        eq(slots.id, visits.slotId),
+        gt(slots.startsAt, sql`now()`),
+      ),
+    )
     .returning({ id: visits.id });
   if (!visit) return false;
   await tx
@@ -103,7 +129,7 @@ async function cancelInTx(tx: Tx, visitId: number) {
   return true;
 }
 
-/** Frees the slot straight away. Returns false if the visit is not currently booked. */
+/** Frees the slot straight away. Returns false unless the visit is booked and still ahead. */
 export function cancelVisit(visitId: number): Promise<boolean> {
   return db.transaction((tx) => cancelInTx(tx, visitId));
 }
@@ -120,6 +146,37 @@ export async function rescheduleVisit(visitId: number, newSlotId: number): Promi
     });
   } catch (e) {
     if (e instanceof Rollback) return { ok: false, reason: e.reason };
+    // Two buyers swapping slots can deadlock. Postgres aborts one, whose slot was simply taken.
+    const code = (e as { cause?: { code?: string } }).cause?.code ?? (e as { code?: string }).code;
+    if (code === "40P01") return { ok: false, reason: "slot_taken" };
     throw e;
   }
+}
+
+/** Stops all further contact with this person: every lead with their phone, every pending message. */
+export function optOut(leadId: number) {
+  return db.transaction(async (tx) => {
+    const [lead] = await tx.select().from(leads).where(eq(leads.id, leadId));
+    if (!lead) return false;
+    const now = new Date();
+    const affected = await tx
+      .update(leads)
+      .set({ optedOutAt: now })
+      .where(lead.phone ? eq(leads.phone, lead.phone) : eq(leads.id, leadId))
+      .returning({ id: leads.id });
+    await tx
+      .update(messages)
+      .set({ cancelledAt: now })
+      .where(
+        and(
+          inArray(
+            messages.leadId,
+            affected.map((l) => l.id),
+          ),
+          gt(messages.sendAt, now),
+          isNull(messages.cancelledAt),
+        ),
+      );
+    return true;
+  });
 }

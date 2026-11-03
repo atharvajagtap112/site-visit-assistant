@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../db";
-import { messages, visits } from "../db/schema";
-import { bookVisit, cancelVisit, getFreeSlots, rescheduleVisit } from "../lib/booking";
+import { leads, messages, visits } from "../db/schema";
+import { bookVisit, cancelVisit, getFreeSlots, optOut, rescheduleVisit } from "../lib/booking";
 import { makeLead, makeProject, makeSlot, resetDb } from "./helpers";
 
 beforeEach(resetDb);
@@ -83,6 +83,35 @@ describe("consent", () => {
   });
 });
 
+describe("opt-out", () => {
+  it("covers duplicate leads with the same phone", async () => {
+    const slot = await makeSlot((await makeProject()).id);
+    const phone = "+919000000001";
+    const original = await makeLead({ phone });
+    const duplicate = await makeLead({ phone, duplicateOfId: original.id });
+
+    await optOut(original.id);
+
+    expect(failure(await bookVisit(slot.id, duplicate.id))).toBe("opted_out");
+  });
+
+  it("cancels pending messages for the person but leaves other buyers alone", async () => {
+    const project = await makeProject();
+    const lead = await makeLead({ phone: "+919000000002" });
+    const mine = await bookVisit((await makeSlot(project.id, 72)).id, lead.id);
+    const other = await bookVisit((await makeSlot(project.id, 73)).id, (await makeLead()).id);
+    if (!mine.ok || !other.ok) throw new Error("setup failed");
+
+    await optOut(lead.id);
+
+    const sent = (visitId: number) => db.select().from(messages).where(eq(messages.visitId, visitId));
+    const reminders = (await sent(mine.visitId)).filter((m) => m.kind !== "confirmation");
+    expect(reminders.length).toBeGreaterThan(0);
+    expect(reminders.every((m) => m.cancelledAt)).toBe(true);
+    expect((await sent(other.visitId)).every((m) => !m.cancelledAt)).toBe(true);
+  });
+});
+
 describe("reminders", () => {
   const kinds = async (visitId: number) =>
     (await db.select().from(messages).where(eq(messages.visitId, visitId))).map((m) => m.kind).sort();
@@ -107,6 +136,46 @@ describe("reminders", () => {
 });
 
 describe("cancel and reschedule", () => {
+  it("does not cancel a visit whose time has passed", async () => {
+    const past = await makeSlot((await makeProject()).id, -2);
+    const [visit] = await db
+      .insert(visits)
+      .values({ slotId: past.id, leadId: (await makeLead()).id })
+      .returning();
+
+    expect(await cancelVisit(visit.id)).toBe(false);
+    const [row] = await db.select().from(visits).where(eq(visits.id, visit.id));
+    expect(row.status).toBe("booked");
+  });
+
+  it("returns a normal failure when two buyers swap slots at once", async () => {
+    const project = await makeProject();
+    for (let round = 0; round < 8; round++) {
+      const a = await makeSlot(project.id, 72 + round * 2);
+      const b = await makeSlot(project.id, 73 + round * 2);
+      const first = await bookVisit(a.id, (await makeLead()).id);
+      const second = await bookVisit(b.id, (await makeLead()).id);
+      if (!first.ok || !second.ok) throw new Error("setup failed");
+
+      const results = await Promise.all([
+        rescheduleVisit(first.visitId, b.id),
+        rescheduleVisit(second.visitId, a.id),
+      ]);
+
+      for (const result of results) expect(failure(result)).toBe("slot_taken");
+    }
+  });
+
+  it("moves the lead to the project it booked", async () => {
+    const [p1, p2] = [await makeProject(), await makeProject("q")];
+    const lead = await makeLead({ projectId: p1.id });
+
+    await bookVisit((await makeSlot(p2.id)).id, lead.id);
+
+    const [row] = await db.select().from(leads).where(eq(leads.id, lead.id));
+    expect(row.projectId).toBe(p2.id);
+  });
+
   it("frees the slot and cancels pending reminders on cancel", async () => {
     const project = await makeProject();
     const slot = await makeSlot(project.id);

@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { hashPassword } from "../lib/auth";
 import { bookVisit } from "../lib/booking";
 import { db, pool } from "./index";
-import { leads, projects, slots, users, visits } from "./schema";
+import { facts, leads, projects, slots, users, visits } from "./schema";
 
 // The seed wipes every table, so it needs an explicit go-ahead on anything but a local database.
 const { hostname } = new URL(process.env.DATABASE_URL!);
@@ -20,7 +20,7 @@ const VISIT_HOURS = [10, 11, 12, 14, 15, 16, 17];
 const DAYS_AHEAD = 60;
 const DAYS_BACK = 28;
 
-// Fixed-seed random numbers, so every reseed produces the same demo data.
+// Fixed-seed random numbers, so reseeding keeps the same people. Visit times shift with the clock.
 let randomState = 58210;
 const random = () => {
   randomState = (randomState * 1664525 + 1013904223) % 4294967296;
@@ -71,6 +71,19 @@ const [project1, project2] = await db
   ])
   .returning();
 
+// From the brief: 420 apartments, 2 and 3 BHK, the price range. Parking, amenities and visit hours
+// are assumptions. Schools, loans and possession are left out on purpose, so the handoff shows.
+await db.insert(facts).values([
+  { topic: "Homes", content: "2 BHK and 3 BHK apartments." },
+  { topic: "Size of the development", content: "420 apartments across both projects." },
+  { topic: "Price range", content: "Homes range from ₹65 lakh to ₹1.2 crore. The sales team confirms the exact price of each home." },
+  { topic: "Site visits", content: "Free of charge, by booked time, between 10 am and 5 pm every day." },
+  { projectId: project1.id, topic: "Parking", content: "One covered parking space with each home." },
+  { projectId: project1.id, topic: "Amenities", content: "Clubhouse, children's play area and 24-hour security." },
+  { projectId: project2.id, topic: "Parking", content: "One covered parking space with each home." },
+  { projectId: project2.id, topic: "Amenities", content: "Landscaped garden, gym and 24-hour security." },
+]);
+
 const slotRows = [project1, project2].flatMap((project) =>
   Array.from({ length: DAYS_BACK + DAYS_AHEAD }, (_, i) => i - DAYS_BACK).flatMap((day) =>
     VISIT_HOURS.map((hour) => ({ projectId: project.id, startsAt: istTime(day, hour) })),
@@ -105,13 +118,15 @@ function takeSlot(projectId: number, dayOffsetMin: number, dayOffsetMax: number)
 }
 
 // The three sample leads from the brief.
-const consentAt = new Date(Date.now() - 10 * DAY);
+const hardikCreatedAt = new Date("2026-10-28T10:00:00+05:30"); // Before his fixed sample visit.
+const nidhiCreatedAt = new Date(Date.now() - 2 * DAY);
+const kavitaCreatedAt = new Date(Date.now() - 12 * DAY);
 const [hardik, nidhi, kavita] = await db
   .insert(leads)
   .values([
-    { id: 58210, name: "Hardik Patel", phone: "+919000058210", source: "property_portal" as const, projectId: project1.id, wants: "3 BHK", assignedToId: executives[0].id, status: "contacted" as const, consentAt, createdAt: new Date(Date.now() - 6 * DAY), firstResponseAt: new Date(Date.now() - 6 * DAY + 90_000) },
-    { id: 58211, name: "Nidhi Shah", phone: "+919000058211", source: "social_ad" as const, projectId: project2.id, wants: "2 BHK", assignedToId: executives[1].id, status: "new" as const, consentAt, createdAt: new Date(Date.now() - 2 * DAY), firstResponseAt: new Date(Date.now() - 2 * DAY + 60_000) },
-    { id: 58224, name: "Kavita Joshi", phone: "+919000058224", source: "hoarding_call" as const, projectId: project2.id, wants: "2 BHK", assignedToId: executives[2].id, status: "contacted" as const, consentAt, createdAt: new Date(Date.now() - 12 * DAY), firstResponseAt: new Date(Date.now() - 12 * DAY + 240_000) },
+    { id: 58210, name: "Hardik Patel", phone: "+919000058210", source: "property_portal" as const, projectId: project1.id, wants: "3 BHK", assignedToId: executives[0].id, status: "contacted" as const, consentAt: hardikCreatedAt, createdAt: hardikCreatedAt, firstResponseAt: new Date(hardikCreatedAt.getTime() + 90_000) },
+    { id: 58211, name: "Nidhi Shah", phone: "+919000058211", source: "social_ad" as const, projectId: project2.id, wants: "2 BHK", assignedToId: executives[1].id, status: "new" as const, consentAt: nidhiCreatedAt, createdAt: nidhiCreatedAt, firstResponseAt: new Date(nidhiCreatedAt.getTime() + 60_000) },
+    { id: 58224, name: "Kavita Joshi", phone: "+919000058224", source: "hoarding_call" as const, projectId: project2.id, wants: "2 BHK", assignedToId: executives[2].id, status: "contacted" as const, consentAt: kavitaCreatedAt, createdAt: kavitaCreatedAt, firstResponseAt: new Date(kavitaCreatedAt.getTime() + 240_000) },
   ])
   .returning();
 void nidhi;
@@ -153,9 +168,10 @@ const inserted = await db.insert(leads).values(generated).returning();
 for (const lead of inserted) {
   if (!lead.firstResponseAt) continue; // Nobody has replied to this lead, so no visit could exist.
   const roll = random();
-  if (roll < 0.25) {
+  const daysSinceEnquiry = (Date.now() - lead.createdAt.getTime()) / DAY;
+  if (roll < 0.25 && daysSinceEnquiry > 2) {
     await db.insert(visits).values({
-      slotId: takeSlot(lead.projectId!, -DAYS_BACK, -1).id,
+      slotId: takeSlot(lead.projectId!, -daysSinceEnquiry + 1, -1).id,
       leadId: lead.id,
       status: random() < 0.7 ? "visited" : "no_show",
     });

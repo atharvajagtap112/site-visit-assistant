@@ -9,10 +9,10 @@ export const resetDb = () =>
     sql`TRUNCATE messages, visits, slots, leads, projects, sessions, users RESTART IDENTITY CASCADE`,
   );
 
-export async function makeProject() {
+export async function makeProject(slug = "p") {
   const [project] = await db
     .insert(projects)
-    .values({ slug: "p", name: "P", reraNumber: "R", locationLabel: "L", mapUrl: "https://x.example" })
+    .values({ slug, name: slug.toUpperCase(), reraNumber: "R", locationLabel: "L", mapUrl: "https://x.example" })
     .returning();
   return project;
 }
