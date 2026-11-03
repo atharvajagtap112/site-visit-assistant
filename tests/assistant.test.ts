@@ -168,6 +168,17 @@ describe("what reaches the model", () => {
     expect(JSON.stringify(seen)).not.toMatch(/9999988888|Secret Name/);
   });
 
+  it("removes a phone number the buyer types into the chat", async () => {
+    const { conversation } = await setup();
+    const { llm, seen } = scripted("Thank you.");
+
+    await respond(conversation.id, "Call me on +91 98765 43210 or ९८७६५४३२१०", llm);
+
+    expect(JSON.stringify(seen)).not.toMatch(/98765|९८७६५/);
+    const stored = await db.select().from(chatMessages).where(eq(chatMessages.conversationId, conversation.id));
+    expect(stored[0].content).toContain("98765 43210");
+  });
+
   it("includes this project's facts and the earlier chat", async () => {
     const { conversation } = await setup();
     await respond(conversation.id, "First question", scripted("First answer.").llm);

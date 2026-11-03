@@ -1,14 +1,9 @@
-import { randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db } from "@/db";
-import { leads, leadSourceEnum, languageEnum, projects } from "@/db/schema";
-import { findConversation, respond, startConversation } from "@/lib/assistant";
-
-const COOKIE = "chat";
-const COOKIE_DAYS = 30;
+import { languageEnum, leadSourceEnum } from "@/db/schema";
+import { respond } from "@/lib/assistant";
+import { getBuyerState } from "@/lib/buyer";
+import { ensureConversation } from "@/lib/buyer-session";
 
 const body = z.object({
   message: z.string().trim().min(1).max(800),
@@ -24,24 +19,9 @@ export async function POST(request: Request) {
   }
   const { message, language, source, project } = parsed.data;
 
-  const store = await cookies();
-  const existing = store.get(COOKIE)?.value;
-  let conversation = existing ? await findConversation(existing) : null;
+  const conversation = await ensureConversation({ language, source, projectSlug: project });
+  const turn = await respond(conversation.id, message);
+  const state = await getBuyerState(conversation.leadId);
 
-  if (conversation) {
-    await db.update(leads).set({ language }).where(eq(leads.id, conversation.leadId));
-  } else {
-    const token = randomBytes(32).toString("base64url");
-    const [row] = project ? await db.select().from(projects).where(eq(projects.slug, project)) : [];
-    conversation = await startConversation(token, { source, language, projectId: row?.id });
-    store.set(COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: COOKIE_DAYS * 24 * 60 * 60,
-    });
-  }
-
-  return NextResponse.json(await respond(conversation.id, message));
+  return NextResponse.json({ ...turn, hasContact: state?.hasContact ?? false });
 }

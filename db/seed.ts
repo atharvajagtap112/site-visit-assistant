@@ -35,7 +35,7 @@ function istTime(dayOffset: number, hour: number) {
 }
 
 await db.execute(
-  sql`TRUNCATE messages, visits, slots, leads, projects, sessions, users RESTART IDENTITY CASCADE`,
+  sql`TRUNCATE otp_codes, messages, visits, slots, leads, projects, sessions, users RESTART IDENTITY CASCADE`,
 );
 
 const passwordHash = await hashPassword(DEMO_PASSWORD);
@@ -57,6 +57,8 @@ const [project1, project2] = await db
     {
       slug: "project-1",
       name: "Project 1",
+      homes: "2 BHK, 3 BHK",
+      priceRange: "₹65 lakh – ₹1.2 crore",
       reraNumber: "PLACEHOLDER-RERA-P1",
       locationLabel: "Ahmedabad (placeholder address)",
       mapUrl: "https://maps.google.com/?q=Ahmedabad",
@@ -64,6 +66,8 @@ const [project1, project2] = await db
     {
       slug: "project-2",
       name: "Project 2",
+      homes: "2 BHK, 3 BHK",
+      priceRange: "₹65 lakh – ₹1.2 crore",
       reraNumber: "PLACEHOLDER-RERA-P2",
       locationLabel: "Ahmedabad (placeholder address)",
       mapUrl: "https://maps.google.com/?q=Ahmedabad",
@@ -74,9 +78,8 @@ const [project1, project2] = await db
 // From the brief: 420 apartments, 2 and 3 BHK, the price range. Parking, amenities and visit hours
 // are assumptions. Schools, loans and possession are left out on purpose, so the handoff shows.
 await db.insert(facts).values([
-  { topic: "Homes", content: "2 BHK and 3 BHK apartments." },
   { topic: "Size of the development", content: "420 apartments across both projects." },
-  { topic: "Price range", content: "Homes range from ₹65 lakh to ₹1.2 crore. The sales team confirms the exact price of each home." },
+  { topic: "Pricing", content: "The sales team confirms the exact price of each home." },
   { topic: "Site visits", content: "Free of charge, by booked time, between 10 am and 5 pm every day." },
   { projectId: project1.id, topic: "Parking", content: "One covered parking space with each home." },
   { projectId: project1.id, topic: "Amenities", content: "Clubhouse, children's play area and 24-hour security." },

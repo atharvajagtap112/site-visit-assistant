@@ -54,6 +54,8 @@ export const projects = pgTable("projects", {
   name: text().notNull(),
   reraNumber: text("rera_number").notNull(),
   locationLabel: text("location_label").notNull(),
+  homes: text().notNull(),
+  priceRange: text("price_range").notNull(),
   mapUrl: text("map_url").notNull(),
 });
 
@@ -154,6 +156,14 @@ export const chatMessages = pgTable(
   },
   (t) => [index("chat_messages_conversation_idx").on(t.conversationId)],
 );
+
+// One-time codes for buyers. Sending is simulated: the code is shown on screen.
+export const otpCodes = pgTable("otp_codes", {
+  phone: text().primaryKey(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  attempts: integer().notNull().default(0),
+});
 
 // Simulated outbox: messages are recorded here and shown to staff, never really sent.
 export const messages = pgTable("messages", {

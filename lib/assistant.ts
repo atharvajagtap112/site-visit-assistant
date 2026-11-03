@@ -16,7 +16,7 @@ import { buildSystemPrompt, CANNED, TOOLS, type Language } from "./assistant-pro
 import { bookVisit, getFreeSlots } from "./booking";
 import { formatVisitTime } from "./format";
 import { gemini, type Llm } from "./llm";
-import { checkReply, mentionsDiscount, promisesPerson } from "./reply-check";
+import { checkReply, mentionsDiscount, normalise, promisesPerson } from "./reply-check";
 
 const MAX_TOOL_ROUNDS = 4;
 const TURN_BUDGET_MS = 75_000;
@@ -33,6 +33,10 @@ export type ChatCard =
   | { type: "booking_form" };
 
 export type ChatTurn = { reply: string; cards: ChatCard[]; aiAvailable: boolean };
+
+/** A buyer may type their number into the chat anyway. It stays with us and never reaches the model. */
+export const redactPhones = (text: string) =>
+  normalise(text).replace(/(?:\+?91[\s-]*)?(?<!\d)[6-9](?:[\s-]*\d){9}(?!\d)/g, "[phone number removed]");
 
 const indiaDate = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
@@ -78,31 +82,37 @@ async function loadFactSheet(projectId: number | null) {
     section("All projects", factRows.filter((f) => !f.projectId)),
     ...projectRows.map((p) =>
       section(
-        `${p.name} (slug ${p.slug}, RERA registration ${p.reraNumber}, ${p.locationLabel})`,
+        `${p.name} (slug ${p.slug}, RERA registration ${p.reraNumber}, ${p.locationLabel}). Homes: ${p.homes}. Price range: ${p.priceRange}.`,
         factRows.filter((f) => f.projectId === p.id),
       ),
     ),
   ].join("\n\n");
 }
 
-/** Gives the buyer a named person: keeps their executive if they have one, else the least loaded. */
-async function handOff(conversationId: number, leadId: number, reason: string, summary: string | null) {
-  return db.transaction(async (tx) => {
-    const [lead] = await tx.select().from(leads).where(eq(leads.id, leadId)).for("update");
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-    let assignedTo = lead.assignedToId;
-    if (!assignedTo) {
-      const [leastLoaded] = await tx
-        .select({ id: users.id, assigned: count(leads.id) })
-        .from(users)
-        .leftJoin(leads, eq(leads.assignedToId, users.id))
-        .where(eq(users.role, "executive"))
-        .groupBy(users.id)
-        .orderBy(asc(count(leads.id)), asc(users.id))
-        .limit(1);
-      assignedTo = leastLoaded?.id ?? null;
-      await tx.update(leads).set({ assignedToId: assignedTo }).where(eq(leads.id, leadId));
-    }
+/** Keeps the lead's executive if it has one, otherwise gives it to the least loaded one. */
+export async function assignExecutive(tx: Tx, leadId: number) {
+  const [lead] = await tx.select().from(leads).where(eq(leads.id, leadId)).for("update");
+  if (lead.assignedToId) return lead.assignedToId;
+
+  const [leastLoaded] = await tx
+    .select({ id: users.id, assigned: count(leads.id) })
+    .from(users)
+    .leftJoin(leads, eq(leads.assignedToId, users.id))
+    .where(eq(users.role, "executive"))
+    .groupBy(users.id)
+    .orderBy(asc(count(leads.id)), asc(users.id))
+    .limit(1);
+  const assignedTo = leastLoaded?.id ?? null;
+  await tx.update(leads).set({ assignedToId: assignedTo }).where(eq(leads.id, leadId));
+  return assignedTo;
+}
+
+/** Gives the buyer a named person and returns that person's name. */
+export async function handOff(conversationId: number, leadId: number, reason: string, summary: string | null) {
+  return db.transaction(async (tx) => {
+    const assignedTo = await assignExecutive(tx, leadId);
 
     await tx
       .update(conversations)
@@ -253,7 +263,7 @@ export async function respond(
 
   const contents: Content[] = history.reverse().map((m) => ({
     role: m.role === "buyer" ? "user" : "model",
-    parts: [{ text: m.content }],
+    parts: [{ text: redactPhones(m.content) }],
   }));
 
   const factSheet = await loadFactSheet(lead.projectId);

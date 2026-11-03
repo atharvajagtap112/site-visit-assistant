@@ -54,6 +54,17 @@ async function isOptedOut(tx: Tx, lead: typeof leads.$inferSelect) {
   return Boolean(other);
 }
 
+/** One person, one upcoming visit, even when they have enquired more than once. */
+async function phoneHasActiveVisit(tx: Tx, phone: string) {
+  const [active] = await tx
+    .select({ id: visits.id })
+    .from(visits)
+    .innerJoin(leads, eq(leads.id, visits.leadId))
+    .where(and(eq(leads.phone, phone), eq(visits.status, "booked")))
+    .limit(1);
+  return Boolean(active);
+}
+
 async function bookInTx(tx: Tx, slotId: number, leadId: number): Promise<BookingResult> {
   const [slot] = await tx.select().from(slots).where(eq(slots.id, slotId));
   if (!slot || !slot.isOpen || slot.startsAt <= new Date()) {
@@ -63,6 +74,11 @@ async function bookInTx(tx: Tx, slotId: number, leadId: number): Promise<Booking
   const [lead] = await tx.select().from(leads).where(eq(leads.id, leadId));
   if (!lead) return { ok: false, reason: "lead_not_found" };
   if (await isOptedOut(tx, lead)) return { ok: false, reason: "opted_out" };
+  if (lead.phone) {
+    // The unique index is per lead, so two enquiries from one phone are kept apart by this lock.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lead.phone}))`);
+    if (await phoneHasActiveVisit(tx, lead.phone)) return { ok: false, reason: "already_booked" };
+  }
   if (!lead.consentAt) return { ok: false, reason: "no_consent" };
 
   // The partial unique indexes decide the winner. A concurrent insert waits for the

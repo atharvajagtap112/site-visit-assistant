@@ -1,0 +1,105 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
+import { STRINGS, type Language } from "@/lib/i18n";
+import { BookingSheet } from "./booking-sheet";
+import { postJson, secondaryButton } from "./ui";
+
+export function VisitActions({ language, project }: { language: Language; project: string }) {
+  const t = STRINGS[language];
+  const router = useRouter();
+  const confirm = useRef<HTMLDialogElement>(null);
+  const [changing, setChanging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function cancel() {
+    setBusy(true);
+    setFailed(false);
+    const { ok } = await postJson("/api/visit/manage", { action: "cancel" });
+    setBusy(false);
+    confirm.current?.close();
+    if (ok) router.replace("/visit?done=cancelled");
+    else setFailed(true);
+  }
+
+  return (
+    <div>
+      {failed && (
+        <p role="alert" className="mb-3 text-sm text-alert">
+          {t.bookingFailed}
+        </p>
+      )}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <button type="button" onClick={() => setChanging(true)} className={secondaryButton}>
+          {t.reschedule}
+        </button>
+        <button type="button" onClick={() => confirm.current?.showModal()} className={`${secondaryButton} text-alert`}>
+          {t.cancelVisit}
+        </button>
+      </div>
+
+      <dialog ref={confirm} lang={language} aria-label={t.cancelVisit} className="m-auto w-full max-w-sm rounded-lg bg-paper p-5 text-ink">
+        <p className="font-serif text-2xl">{t.cancelVisit}</p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={cancel}
+          className="mt-5 w-full rounded-md bg-alert px-5 py-3 font-medium text-white disabled:opacity-60"
+        >
+          {t.confirmCancel}
+        </button>
+        <button type="button" onClick={() => confirm.current?.close()} className={`mt-2 w-full ${secondaryButton}`}>
+          {t.close}
+        </button>
+      </dialog>
+
+      <BookingSheet
+        open={changing}
+        onClose={() => setChanging(false)}
+        t={t}
+        language={language}
+        project={project}
+        hasContact
+        reschedule
+        onRescheduled={() => {
+          setChanging(false);
+          router.replace("/visit?done=changed");
+          router.refresh();
+        }}
+      />
+    </div>
+  );
+}
+
+export function OptOut({ language }: { language: Language }) {
+  const t = STRINGS[language];
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function optOut() {
+    setBusy(true);
+    setFailed(false);
+    const { ok } = await postJson("/api/visit/manage", { action: "opt_out" });
+    setBusy(false);
+    if (ok) router.refresh();
+    else setFailed(true);
+  }
+
+  return (
+    <section className="mt-10 border-t border-line pt-6">
+      <h2 className="font-medium">{t.optOutTitle}</h2>
+      <p className="mt-1 text-sm text-muted">{t.optOutHelp}</p>
+      {failed && (
+        <p role="alert" className="mt-2 text-sm text-alert">
+          {t.notSent}
+        </p>
+      )}
+      <button type="button" disabled={busy} onClick={optOut} className={`mt-3 ${secondaryButton}`}>
+        {t.optOut}
+      </button>
+    </section>
+  );
+}

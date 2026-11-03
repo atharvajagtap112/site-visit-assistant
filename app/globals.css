@@ -11,8 +11,8 @@
   --color-amber: #85560a;
   --color-amber-soft: #f7f0e1;
   --color-alert: #a32d24;
-  --font-serif: var(--font-newsreader), Georgia, serif;
-  --font-sans: var(--font-hanken), system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), var(--font-hi-serif), var(--font-gu-serif), Georgia, serif;
+  --font-sans: var(--font-hanken), var(--font-hi-sans), var(--font-gu-sans), system-ui, sans-serif;
 }
 
 body {
@@ -20,6 +20,10 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+dialog::backdrop {
+  background: rgb(22 32 27 / 0.45);
 }
 
 :focus-visible {

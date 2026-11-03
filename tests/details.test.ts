@@ -84,7 +84,7 @@ describe("booking details", () => {
     const project = await makeProject();
     const [otherProject] = await db
       .insert(projects)
-      .values({ slug: "q", name: "Q", reraNumber: "R2", locationLabel: "L", mapUrl: "https://y.example" })
+      .values({ slug: "q", name: "Q", reraNumber: "R2", locationLabel: "L", mapUrl: "https://y.example", homes: "2 BHK", priceRange: "₹65 lakh" })
       .returning();
     await makeSlot(otherProject.id, 70);
     const later = await makeSlot(project.id, 74);
