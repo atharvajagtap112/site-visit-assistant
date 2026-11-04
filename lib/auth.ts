@@ -10,6 +10,13 @@ export const SESSION_DAYS = 7;
 
 export type SessionUser = Pick<typeof users.$inferSelect, "id" | "name" | "email" | "role">;
 
+export class NotAllowedError extends Error {}
+
+/** First line of every sales-head-only library function, so no caller can forget the check. */
+export function assertHead(user: SessionUser) {
+  if (user.role !== "sales_head") throw new NotAllowedError("Sales head only");
+}
+
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   return `${salt}:${(await scryptAsync(password, salt, 64)).toString("hex")}`;

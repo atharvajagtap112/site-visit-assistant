@@ -358,9 +358,19 @@ describe("createLead", () => {
     expect(warned).toEqual({
       ok: false,
       reason: "duplicate",
-      existing: { id: existing.id, name: "First", executive: jay.name, canOpen: false, optedOut: false },
+      existing: { id: existing.id, name: null, executive: jay.name, canOpen: false, optedOut: false },
     });
     expect(await db.select().from(leads)).toHaveLength(1);
+  });
+
+  it("shows the name on a duplicate warning only to someone who can open that lead", async () => {
+    const { riya } = await team();
+    const project = await makeProject();
+    await makeLead({ phone: "+919876500001", assignedToId: riya.id, name: "First" });
+
+    const warned = await createLead(riya, input(project.id));
+
+    expect(warned).toMatchObject({ reason: "duplicate", existing: { name: "First", canOpen: true } });
   });
 
   it("links a confirmed duplicate to the earliest lead and keeps its executive", async () => {

@@ -14,7 +14,7 @@ import {
 import { hashToken } from "./auth";
 import { buildSystemPrompt, CANNED, TOOLS, type Language } from "./assistant-prompt";
 import { bookVisit, getFreeSlots } from "./booking";
-import { formatVisitTime } from "./format";
+import { formatVisitTime, indiaDate } from "./format";
 import { chatModel, type Llm } from "./llm";
 import { checkReply, dropStrayScript, mentionsDiscount, normalise, promisesPerson } from "./reply-check";
 
@@ -38,7 +38,6 @@ export type ChatTurn = { reply: string; cards: ChatCard[]; aiAvailable: boolean 
 export const redactPhones = (text: string) =>
   normalise(text).replace(/(?<!\d)(?:\+?91|0)?[\s().-]*[6-9](?:[\s().-]*\d){9}(?!\d)/g, " [phone number removed]");
 
-const indiaDate = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 // Models add the year to a time they repeat, and the reply check only passes numbers a tool gave.
 const indiaYear = (date: Date) => indiaDate(date).slice(0, 4);
 
@@ -329,7 +328,7 @@ export async function respond(
   if (failure) {
     await db
       .update(conversations)
-      .set({ flaggedAt: new Date(), flagReason: failure })
+      .set({ flaggedAt: new Date(), flagReason: failure, reviewedAt: null })
       .where(eq(conversations.id, conversationId));
     return finish(
       CANNED.blocked[language],

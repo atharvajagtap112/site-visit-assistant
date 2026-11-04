@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatVisitTime, formatWait, visitLabel } from "../lib/format";
+import { formatDuration, formatVisitTime, formatWait, visitLabel } from "../lib/format";
 
 describe("format", () => {
   const AT = new Date("2026-11-08T05:30:00Z"); // 11:00 am in India
@@ -35,5 +35,12 @@ describe("format", () => {
     [48 * 3600, "2 days"],
   ])("formats a wait of %i seconds", (seconds, text) => {
     expect(formatWait(new Date(0), new Date(seconds * 1000))).toBe(text);
+  });
+
+  it("keeps the seconds of a short duration, so a figure near a target reads true", () => {
+    expect(formatDuration(45_000)).toBe("45 sec");
+    expect(formatDuration(299_000)).toBe("4 min 59 sec");
+    expect(formatDuration(301_000)).toBe("5 min 1 sec");
+    expect(formatDuration(3_600_000)).toBe("1 hr");
   });
 });

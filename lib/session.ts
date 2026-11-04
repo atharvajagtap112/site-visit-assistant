@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { createSession, deleteSession, getSessionUser } from "./auth";
 
@@ -13,6 +13,13 @@ export const getCurrentUser = cache(async () => {
 export async function requireUser() {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
+  return user;
+}
+
+/** An executive gets the same 404 as for a page that does not exist. */
+export async function requireHead() {
+  const user = await requireUser();
+  if (user.role !== "sales_head") notFound();
   return user;
 }
 

@@ -62,6 +62,9 @@ const visitTime = new Intl.DateTimeFormat("en-IN", {
 /** Always India time, wherever the server runs. */
 export const formatVisitTime = (date: Date) => visitTime.format(date);
 
+/** YYYY-MM-DD in India, wherever the server runs. */
+export const indiaDate = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
 export function formatWait(from: Date, to: Date) {
   const seconds = Math.max(0, Math.round((to.getTime() - from.getTime()) / 1000));
   if (seconds < 60) return `${seconds} sec`;
@@ -69,6 +72,14 @@ export function formatWait(from: Date, to: Date) {
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   return hours < 48 ? `${hours} hr` : `${Math.floor(hours / 24)} days`;
+}
+
+/** Keeps the seconds under an hour, so 4 min 59 sec and 5 min 1 sec read differently against a 5 minute target. */
+export function formatDuration(ms: number) {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds} sec`;
+  if (seconds >= 3600) return formatWait(new Date(0), new Date(ms));
+  return `${Math.floor(seconds / 60)} min ${seconds % 60} sec`;
 }
 
 export function visitLabel(visit: { status: VisitStatus; startsAt: Date } | null, now = new Date()) {

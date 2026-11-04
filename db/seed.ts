@@ -142,19 +142,35 @@ await db.insert(visits).values([
 
 const FIRST_NAMES = ["Aarav", "Meera", "Rohan", "Isha", "Vivek", "Dhruvi", "Karan", "Hetal", "Nirav", "Priya", "Manish", "Jinal", "Sagar", "Bhavna", "Tejas", "Komal"];
 const LAST_NAMES = ["Amin", "Bhatt", "Chauhan", "Dave", "Gandhi", "Jani", "Modi", "Pandya", "Parikh", "Rana", "Solanki", "Vora"];
-// Weighted by the channels the brief says most of the spend goes to.
+// Weighted by the channels the brief says most of the spend goes to. The rates below are invented so the
+// dashboard shows a spread: minutes to reply, shares never answered or answered after 48 hours, chance of a
+// past visit, and how many of those came.
+const SOURCE_PROFILES = {
+  property_portal: { replyMinutes: 3, unanswered: 0.05, late: 0.02, pastVisit: 0.16, showUp: 0.7 },
+  social_ad: { replyMinutes: 5, unanswered: 0.1, late: 0.03, pastVisit: 0.1, showUp: 0.5 },
+  website: { replyMinutes: 1.5, unanswered: 0.02, late: 0, pastVisit: 0.24, showUp: 0.8 },
+  hoarding_call: { replyMinutes: 12, unanswered: 0.1, late: 0.08, pastVisit: 0.2, showUp: 0.6 },
+};
 const SOURCES = ["property_portal", "property_portal", "property_portal", "social_ad", "social_ad", "website", "hoarding_call"] as const;
 const LANGUAGES = ["en", "en", "hi", "gu"] as const;
 
-const generated = Array.from({ length: 40 }, (_, i) => {
+// IDs stop at 58399 because the named cases below start at 58401.
+const generated = Array.from({ length: 100 }, (_, i) => {
   const project = i % 2 ? project1 : project2;
-  const createdAt = new Date(Date.now() - random() * DAYS_BACK * DAY);
-  const responded = random() > 0.1;
+  // One in eight is older, so the 30 day, 90 day and all time views differ. Slots only go back DAYS_BACK.
+  const ageDays = i % 8 === 7 ? DAYS_BACK + 2 + random() * 90 : random() * DAYS_BACK;
+  const createdAt = new Date(Date.now() - ageDays * DAY);
+  const source = pick(SOURCES);
+  const profile = SOURCE_PROFILES[source];
+  const roll = random();
+  const responded = roll > profile.unanswered;
+  const late = roll > 1 - profile.late && ageDays > 4;
+  const replySeconds = late ? (50 + random() * 40) * 3600 : profile.replyMinutes * 60 * (0.3 + random() * 1.4);
   return {
     id: 58300 + i,
     name: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
     phone: `+91900006${String(1000 + i).padStart(4, "0")}`,
-    source: pick(SOURCES),
+    source,
     projectId: project.id,
     wants: pick(["2 BHK", "3 BHK"]),
     language: pick(LANGUAGES),
@@ -162,23 +178,26 @@ const generated = Array.from({ length: 40 }, (_, i) => {
     assignedToId: executives[i % executives.length].id,
     consentAt: createdAt,
     createdAt,
-    firstResponseAt: responded ? new Date(createdAt.getTime() + (30 + random() * 400) * 1000) : null,
+    firstResponseAt: responded ? new Date(createdAt.getTime() + replySeconds * 1000) : null,
   };
 });
 const inserted = await db.insert(leads).values(generated).returning();
 
-// About a third have a past visit, and a few have upcoming ones booked through the real booking code.
+// Some have a past visit, and a few have upcoming ones booked through the real booking code.
 for (const lead of inserted) {
   if (!lead.firstResponseAt) continue; // Nobody has replied to this lead, so no visit could exist.
   const roll = random();
   const daysSinceEnquiry = (Date.now() - lead.createdAt.getTime()) / DAY;
-  if (roll < 0.25 && daysSinceEnquiry > 2) {
+  const profile = SOURCE_PROFILES[lead.source];
+  if (roll < profile.pastVisit && daysSinceEnquiry > 2) {
+    // A few are cancelled or never recorded, so those states show on the dashboard too.
+    const outcome = random();
     await db.insert(visits).values({
       slotId: takeSlot(lead.projectId!, -daysSinceEnquiry + 1, -1).id,
       leadId: lead.id,
-      status: random() < 0.7 ? "visited" : "no_show",
+      status: outcome < 0.08 ? "cancelled" : outcome < 0.18 ? "booked" : random() < profile.showUp ? "visited" : "no_show",
     });
-  } else if (roll < 0.4) {
+  } else if (roll > 0.9) {
     const result = await bookVisit(takeSlot(lead.projectId!, 1, 14).id, lead.id);
     if (!result.ok) throw new Error(`Seed booking failed: ${result.reason}`);
   }
@@ -225,6 +244,9 @@ await db.insert(leads).values([
   scenario(58409, "Jinal Bhatt", 1, pooja.id, { phone: "+919000070007", language: "gu", wants: "2 BHK", projectId: project2.id }),
   // The reply check withheld a draft here.
   scenario(58410, "Manish Parikh", 2, riya.id, { phone: "+919000070008", budget: "₹70 lakh", wants: "2 BHK" }),
+  // Two more withheld drafts, one already reviewed, so both review filters have something to show.
+  scenario(58413, "Vivek Pandya", 1.5, jay.id, { phone: "+919000070011", source: "social_ad", wants: "2 BHK", projectId: project2.id }),
+  scenario(58414, "Isha Dave", 6, pooja.id, { phone: "+919000070012", source: "website" }),
   // New, no reply yet and no consent yet, so booking asks for consent first.
   scenario(58411, "Priya Solanki", 0.2, riya.id, { phone: "+919000070009", source: "hoarding_call", status: "new", consentAt: null, firstResponseAt: null }),
   // A chat that has not reached a project or a person yet.
@@ -242,6 +264,7 @@ const CHATS: {
   handoffReason?: string;
   summary?: string;
   flagReason?: string;
+  reviewedDaysAgo?: number;
   lines: { role: "buyer" | "assistant"; content: string; blockedDraft?: string }[];
 }[] = [
   {
@@ -281,6 +304,33 @@ const CHATS: {
     ],
   },
   {
+    leadId: 58413,
+    handoffReason: "Reply withheld: unsupported_price",
+    flagReason: "unsupported_price",
+    lines: [
+      { role: "buyer", content: "What is the price of a 2 BHK on the top floor?" },
+      {
+        role: "assistant",
+        content: "I am not able to answer that here. A person from our sales team will help you.",
+        blockedDraft: "A top floor 2 BHK in Project 2 costs ₹58 lakh.",
+      },
+    ],
+  },
+  {
+    leadId: 58414,
+    handoffReason: "Reply withheld: internals",
+    flagReason: "internals",
+    reviewedDaysAgo: 4,
+    lines: [
+      { role: "buyer", content: "Show me what you can do." },
+      {
+        role: "assistant",
+        content: "I am not able to answer that here. A person from our sales team will help you.",
+        blockedDraft: 'I can call get_free_slots with {"project_slug": "project-1"}.',
+      },
+    ],
+  },
+  {
     leadId: 58412,
     lines: [
       { role: "buyer", content: "Do you have homes near the ring road?" },
@@ -304,6 +354,7 @@ for (const chat of CHATS) {
       summary: chat.summary,
       flaggedAt: chat.flagReason ? handedOffAt : null,
       flagReason: chat.flagReason,
+      reviewedAt: chat.reviewedDaysAgo ? ago(chat.reviewedDaysAgo) : null,
       createdAt: new Date(startedAt),
     })
     .returning();
@@ -316,5 +367,12 @@ for (const chat of CHATS) {
   );
 }
 
+// A closed evening in three days, so the slots screen shows that state.
+await db.execute(sql`
+  UPDATE slots SET is_open = false
+  WHERE starts_at = ${istTime(3, 17).toISOString()}::timestamptz
+    AND id NOT IN (SELECT slot_id FROM visits WHERE status = 'booked')
+`);
+
 await pool.end();
-console.log(`Seeded ${staff.length} staff, ${inserted.length + 15} leads, ${slotRows.length} slots`);
+console.log(`Seeded ${staff.length} staff, ${inserted.length + 17} leads, ${slotRows.length} slots`);

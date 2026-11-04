@@ -136,6 +136,8 @@ export const conversations = pgTable("conversations", {
   summary: text(),
   flaggedAt: timestamp("flagged_at", { withTimezone: true }),
   flagReason: text("flag_reason"),
+  // When the sales head last cleared this flag. A new flag on the same chat sets it back to null.
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

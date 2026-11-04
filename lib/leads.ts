@@ -253,7 +253,7 @@ export async function getLeadDetail(user: SessionUser, leadId: number) {
     outbox,
     duplicates: sharing
       .filter((o) => o.id !== leadId)
-      .map((o) => ({ id: o.id, name: o.name, canOpen: canOpen(user, o) })),
+      .map((o) => ({ id: o.id, name: canOpen(user, o) ? o.name : null, canOpen: canOpen(user, o) })),
   };
 }
 
@@ -317,7 +317,8 @@ export function createLead(user: SessionUser, input: NewLead): Promise<CreateLea
         reason: "duplicate",
         existing: {
           id: earlier.lead.id,
-          name: earlier.lead.name,
+          // Typing a phone number must not reveal who holds it on a lead this user cannot open.
+          name: canOpen(user, earlier.lead) ? earlier.lead.name : null,
           executive: earlier.executive,
           canOpen: canOpen(user, earlier.lead),
           optedOut: Boolean(earlier.lead.optedOutAt),

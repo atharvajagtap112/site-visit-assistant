@@ -91,7 +91,8 @@ async function phoneHasActiveVisit(tx: Tx, phone: string) {
 }
 
 async function bookInTx(tx: Tx, slotId: number, leadId: number): Promise<BookingResult> {
-  const [slot] = await tx.select().from(slots).where(eq(slots.id, slotId));
+  // Shared lock: setSlotOpen takes the row lock, so a slot cannot close while a booking lands on it.
+  const [slot] = await tx.select().from(slots).where(eq(slots.id, slotId)).for("share");
   if (!slot || !slot.isOpen || slot.startsAt <= new Date()) {
     return { ok: false, reason: "slot_unavailable" };
   }
