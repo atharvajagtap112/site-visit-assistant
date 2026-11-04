@@ -41,7 +41,7 @@ export default async function ChatPage({
       history={history}
       handedOffTo={conversation?.handedOffAt ? { executive: state?.executive ?? null } : null}
       initialHasContact={state?.hasContact ?? false}
-      initialHasVisit={Boolean(state?.visit)}
+      initialHasVisit={Boolean(state?.visit && state.visit.startsAt > new Date())}
     />
   );
 }

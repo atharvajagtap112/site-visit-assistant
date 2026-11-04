@@ -138,10 +138,10 @@ describe("lead list details", () => {
     await cancelVisit((await book(first.id, withVisit.id)).visitId);
     await book(second.id, withVisit.id);
 
-    const rows = await listLeadsFor(riya);
+    const { rows } = await listLeadsFor(riya);
     expect(rows.map((r) => r.id)).toEqual([withoutVisit.id, withVisit.id]);
     expect(rows[0].visit).toBeNull();
-    expect(rows[1].visit).toEqual({ leadId: withVisit.id, status: "booked", startsAt: second.startsAt });
+    expect(rows[1].visit).toEqual({ status: "booked", startsAt: second.startsAt });
     expect(rows[1].assignedTo).toBe("riya@x.example");
   });
 });

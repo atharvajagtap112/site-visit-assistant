@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { STRINGS, type Language } from "@/lib/i18n";
 import { BookingSheet } from "./booking-sheet";
-import { postJson, secondaryButton } from "./ui";
+import { postJson, primaryButton, secondaryButton } from "./ui";
 
 export function VisitActions({ language, project }: { language: Language; project: string }) {
   const t = STRINGS[language];
@@ -70,6 +70,34 @@ export function VisitActions({ language, project }: { language: Language; projec
         }}
       />
     </div>
+  );
+}
+
+/** For a visit whose time has passed. Booking closes that visit, so the buyer is never locked out. */
+export function BookAgain({ language, project }: { language: Language; project: string }) {
+  const t = STRINGS[language];
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={primaryButton}>
+        {t.bookAgain}
+      </button>
+      <BookingSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        t={t}
+        language={language}
+        project={project}
+        hasContact
+        onBooked={() => {
+          setOpen(false);
+          router.replace("/visit?done=booked");
+          router.refresh();
+        }}
+      />
+    </>
   );
 }
 

@@ -67,7 +67,7 @@ describe("lead access", () => {
     await makeLead({ assignedToId: jay.id });
     await makeLead();
 
-    expect((await listLeadsFor(riya)).map((l) => l.id)).toEqual([riyasLead.id]);
-    expect(await listLeadsFor(head)).toHaveLength(3);
+    expect((await listLeadsFor(riya)).rows.map((l) => l.id)).toEqual([riyasLead.id]);
+    expect((await listLeadsFor(head)).rows).toHaveLength(3);
   });
 });

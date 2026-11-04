@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../db";
 import { leads, messages, visits } from "../db/schema";
-import { bookVisit, cancelVisit, getFreeSlots, optOut, rescheduleVisit } from "../lib/booking";
+import { bookVisit, cancelVisit, correctShowUp, getFreeSlots, optOut, recordShowUp, rescheduleVisit } from "../lib/booking";
 import { makeLead, makeProject, makeSlot, resetDb } from "./helpers";
 
 beforeEach(resetDb);
@@ -109,6 +109,168 @@ describe("opt-out", () => {
     expect(reminders.length).toBeGreaterThan(0);
     expect(reminders.every((m) => m.cancelledAt)).toBe(true);
     expect((await sent(other.visitId)).every((m) => !m.cancelledAt)).toBe(true);
+  });
+});
+
+describe("a past visit nobody recorded", () => {
+  async function staleVisit(leadId: number) {
+    const past = await makeSlot((await makeProject(`past${leadId}`)).id, -2);
+    const [visit] = await db.insert(visits).values({ slotId: past.id, leadId }).returning();
+    return visit;
+  }
+  const statusOf = async (id: number) => (await db.select().from(visits).where(eq(visits.id, id)))[0].status;
+
+  it("closes as no_show when the buyer books again", async () => {
+    const lead = await makeLead({ phone: "+919000000010" });
+    const stale = await staleVisit(lead.id);
+
+    const result = await bookVisit((await makeSlot((await makeProject()).id)).id, lead.id);
+
+    expect(failure(result)).toBe("booked");
+    expect(await statusOf(stale.id)).toBe("no_show");
+  });
+
+  it("closes on a lead with no phone too", async () => {
+    const lead = await makeLead();
+    const stale = await staleVisit(lead.id);
+
+    expect(failure(await bookVisit((await makeSlot((await makeProject()).id)).id, lead.id))).toBe("booked");
+    expect(await statusOf(stale.id)).toBe("no_show");
+  });
+
+  it("closes on another lead with the same phone", async () => {
+    const phone = "+919000000011";
+    const original = await makeLead({ phone });
+    const duplicate = await makeLead({ phone, duplicateOfId: original.id });
+    const stale = await staleVisit(original.id);
+
+    expect(failure(await bookVisit((await makeSlot((await makeProject()).id)).id, duplicate.id))).toBe("booked");
+    expect(await statusOf(stale.id)).toBe("no_show");
+  });
+
+  it("leaves other buyers' past visits alone", async () => {
+    const other = await staleVisit((await makeLead({ phone: "+919000000012" })).id);
+    const lead = await makeLead({ phone: "+919000000013" });
+
+    await bookVisit((await makeSlot((await makeProject()).id)).id, lead.id);
+
+    expect(await statusOf(other.id)).toBe("booked");
+  });
+
+  it.each([
+    ["with a phone", "+919000000014"],
+    ["without a phone", null],
+  ])("still gives one booking when a buyer %s races themselves", async (_, phone) => {
+    const lead = await makeLead({ phone });
+    const stale = await staleVisit(lead.id);
+    const project = await makeProject();
+    const times = await Promise.all(Array.from({ length: 6 }, (_, i) => makeSlot(project.id, 72 + i)));
+
+    const results = await Promise.all(times.map((s) => bookVisit(s.id, lead.id)));
+
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(results.filter((r) => !r.ok).map(failure)).toEqual(Array(5).fill("already_booked"));
+    expect(await statusOf(stale.id)).toBe("no_show");
+    const active = (await db.select().from(visits).where(eq(visits.leadId, lead.id))).filter((v) => v.status === "booked");
+    expect(active).toHaveLength(1);
+  });
+
+  it("lets only one of many buyers with stale visits take a slot", async () => {
+    const buyers = await Promise.all(Array.from({ length: 8 }, () => makeLead()));
+    for (const buyer of buyers) await staleVisit(buyer.id);
+    const slot = await makeSlot((await makeProject()).id);
+
+    const results = await Promise.all(buyers.map((b) => bookVisit(slot.id, b.id)));
+
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(results.filter((r) => !r.ok).map(failure)).toEqual(Array(7).fill("slot_taken"));
+  });
+
+  it("is not closed by a booking that was refused for consent or opt-out", async () => {
+    const slot = await makeSlot((await makeProject()).id);
+    const noConsent = await makeLead({ consentAt: null });
+    const optedOut = await makeLead({ optedOutAt: new Date() });
+    const [a, b] = [await staleVisit(noConsent.id), await staleVisit(optedOut.id)];
+
+    await bookVisit(slot.id, noConsent.id);
+    await bookVisit(slot.id, optedOut.id);
+
+    expect([await statusOf(a.id), await statusOf(b.id)]).toEqual(["booked", "booked"]);
+  });
+
+  it("still blocks a second booking while a visit is ahead on the same phone", async () => {
+    const phone = "+919000000015";
+    const project = await makeProject();
+    await bookVisit((await makeSlot(project.id, 72)).id, (await makeLead({ phone })).id);
+
+    expect(failure(await bookVisit((await makeSlot(project.id, 73)).id, (await makeLead({ phone })).id))).toBe("already_booked");
+  });
+});
+
+describe("recording who came", () => {
+  async function pastVisit(status: "booked" | "visited" | "no_show" | "cancelled" = "booked") {
+    const slot = await makeSlot((await makeProject()).id, -2);
+    const [visit] = await db.insert(visits).values({ slotId: slot.id, leadId: (await makeLead()).id, status }).returning();
+    return visit;
+  }
+  const statusOf = async (id: number) => (await db.select().from(visits).where(eq(visits.id, id)))[0].status;
+
+  it.each(["visited", "no_show"] as const)("records %s on a past booked visit", async (outcome) => {
+    const visit = await pastVisit();
+
+    expect(await recordShowUp(visit.id, outcome)).toEqual({ ok: true });
+    expect(await statusOf(visit.id)).toBe(outcome);
+  });
+
+  it("rejects a visit that is still ahead", async () => {
+    const result = await bookVisit((await makeSlot((await makeProject()).id)).id, (await makeLead()).id);
+    if (!result.ok) throw new Error(result.reason);
+
+    expect(await recordShowUp(result.visitId, "visited")).toEqual({ ok: false, reason: "visit_in_future" });
+    expect(await statusOf(result.visitId)).toBe("booked");
+  });
+
+  it("rejects one already recorded, and leaves the record as it was", async () => {
+    const visit = await pastVisit("visited");
+
+    expect(await recordShowUp(visit.id, "no_show")).toEqual({ ok: false, reason: "already_recorded" });
+    expect(await statusOf(visit.id)).toBe("visited");
+  });
+
+  it("lets only one of two racing records win", async () => {
+    const visit = await pastVisit();
+
+    const results = await Promise.all([recordShowUp(visit.id, "visited"), recordShowUp(visit.id, "no_show")]);
+
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+  });
+
+  it("rejects a cancelled or missing visit", async () => {
+    const visit = await pastVisit("cancelled");
+
+    expect(await recordShowUp(visit.id, "visited")).toEqual({ ok: false, reason: "visit_not_found" });
+    expect(await recordShowUp(999999, "visited")).toEqual({ ok: false, reason: "visit_not_found" });
+  });
+
+  it("corrects visited to no-show and back", async () => {
+    const visit = await pastVisit("visited");
+
+    expect(await correctShowUp(visit.id, "no_show")).toBe(true);
+    expect(await statusOf(visit.id)).toBe("no_show");
+    expect(await correctShowUp(visit.id, "visited")).toBe(true);
+    expect(await statusOf(visit.id)).toBe("visited");
+  });
+
+  it.each(["booked", "cancelled"] as const)("does not correct a %s visit", async (status) => {
+    const visit = await pastVisit(status);
+
+    expect(await correctShowUp(visit.id, "visited")).toBe(false);
+    expect(await correctShowUp(visit.id, "no_show")).toBe(false);
+    expect(await statusOf(visit.id)).toBe(status);
+  });
+
+  it("does not report a correction to the status it already has", async () => {
+    expect(await correctShowUp((await pastVisit("visited")).id, "visited")).toBe(false);
   });
 });
 

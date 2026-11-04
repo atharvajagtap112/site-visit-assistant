@@ -38,20 +38,20 @@ const letters = (script: string) => new RegExp(String.raw`(?=\p{L})\p{Script=${s
 const DEVANAGARI_LETTER = letters("Devanagari");
 const GUJARATI_LETTER = letters("Gujarati");
 
-// Letters and marks only, so digits and Latin text next to a stray word stay. Zero-width joiners sit inside conjuncts.
-const strayGaps = (script: string) => {
-  const word = String.raw`(?:(?=[\p{L}\p{M}])\p{Script=${script}}[‌‍]*)+`;
+// Whole words only, so a longer word that starts with one of these stays intact.
+const courtesyGaps = (words: string[]) => {
+  const word = String.raw`(?<![\p{L}\p{M}])(?:${words.join("|")})(?![\p{L}\p{M}])`;
   const between = String.raw`[\s.,!?…।॥:;–—-]*`;
   return new RegExp(`${between}${word}(?:${between}${word})*${between}`, "gu");
 };
-const DEVANAGARI_GAPS = strayGaps("Devanagari");
-const GUJARATI_GAPS = strayGaps("Gujarati");
+const DEVANAGARI_COURTESY = courtesyGaps(["धन्यवाद", "शुक्रिया", "आभार", "नमस्ते"]);
+const GUJARATI_COURTESY = courtesyGaps(["ધન્યવાદ", "શુક્રિયા", "આભાર", "નમસ્તે"]);
 
 /**
- * The model sometimes ends a Gujarati reply with a Hindi word. Removes the words in whichever of the
- * two scripts has fewer letters, with the spacing and punctuation they leave behind. A tie is left
- * alone since neither is clearly stray. The page language plays no part: a buyer may write Hindi on a Gujarati page.
- * ponytail: it cannot read meaning, so a stray "नहीं" would go too and flip the sentence. The prompt and eval set cover that.
+ * The model sometimes ends a Gujarati reply with a Hindi "thank you". Removes only courtesy words in
+ * whichever of the two scripts has fewer letters, with the spacing and punctuation they leave behind.
+ * Any other mixed text stays: this cannot read meaning, and dropping a stray "नहीं" would reverse a
+ * sentence. A tie is left alone. The page language plays no part: a buyer may write Hindi on a Gujarati page.
  */
 export function dropStrayScript(reply: string) {
   const devanagari = reply.match(DEVANAGARI_LETTER)?.length ?? 0;
@@ -59,17 +59,15 @@ export function dropStrayScript(reply: string) {
   if (!devanagari || !gujarati || devanagari === gujarati) return reply;
 
   const keepsGujarati = gujarati > devanagari;
-  return reply
-    .replace(keepsGujarati ? DEVANAGARI_GAPS : GUJARATI_GAPS, (gap, offset: number) => {
-      if (offset === 0) return "";
-      const found = gap.match(/[.!?…।]/)?.[0];
-      const mark = found === "।" && keepsGujarati ? "." : (found ?? "");
-      if (offset + gap.length === reply.length) return mark;
-      const separator = mark || (gap.match(/[,:;]/)?.[0] ?? "");
-      return separator + (gap.includes("\n") ? "\n" : /\s/.test(gap) ? " " : "");
-    })
-    .replace(/\s*(?:\(\s*\)|""|“\s*”)/g, "")
-    .trim();
+  const without = reply.replace(keepsGujarati ? DEVANAGARI_COURTESY : GUJARATI_COURTESY, (gap, offset: number) => {
+    if (offset === 0) return "";
+    const found = gap.match(/[.!?…।]/)?.[0];
+    const mark = found === "।" && keepsGujarati ? "." : (found ?? "");
+    if (offset + gap.length === reply.length) return mark;
+    const separator = mark || (gap.match(/[,:;]/)?.[0] ?? "");
+    return separator + (gap.includes("\n") ? "\n" : /\s/.test(gap) ? " " : "");
+  });
+  return without === reply ? reply : without.replace(/\s*(?:\(\s*\)|""|“\s*”)/g, "").trim();
 }
 
 export type CheckFailure = "discount" | "internals" | "unsupported_number" | "unsupported_price";

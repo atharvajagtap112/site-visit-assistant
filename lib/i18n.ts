@@ -78,6 +78,7 @@ const en = {
   findVisitHelp: "Enter your mobile number to see your visit.",
   noLeadForPhone: "We have no enquiry for this number.",
   visitPastNote: "This visit's time has passed. Our team will update it shortly.",
+  bookAgain: "Book another visit",
 };
 
 export type Strings = typeof en;
@@ -157,6 +158,7 @@ const hi: Strings = {
   findVisitHelp: "अपनी विज़िट देखने के लिए मोबाइल नंबर दर्ज करें।",
   noLeadForPhone: "इस नंबर से कोई पूछताछ नहीं मिली।",
   visitPastNote: "इस विज़िट का समय बीत चुका है। हमारी टीम जल्द ही इसे अपडेट करेगी।",
+  bookAgain: "दूसरी विज़िट बुक करें",
 };
 
 const gu: Strings = {
@@ -234,6 +236,7 @@ const gu: Strings = {
   findVisitHelp: "તમારી મુલાકાત જોવા માટે મોબાઇલ નંબર દાખલ કરો.",
   noLeadForPhone: "આ નંબરની કોઈ પૂછપરછ મળી નથી.",
   visitPastNote: "આ મુલાકાતનો સમય વીતી ગયો છે. અમારી ટીમ ટૂંક સમયમાં તેને અપડેટ કરશે.",
+  bookAgain: "બીજી મુલાકાત બુક કરો",
 };
 
 export const STRINGS: Record<Language, Strings> = { en, hi, gu };

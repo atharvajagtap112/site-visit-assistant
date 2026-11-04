@@ -138,8 +138,7 @@ describe("safety check on replies", () => {
 describe("a stray word in another script", () => {
   it("is removed before the checks, with no handoff or flag, and the buyer sees what was stored", async () => {
     const { conversation } = await setup();
-    // "चौबीस" alone would fail the number check, so a pass proves the check saw the cleaned text.
-    const { llm } = scripted("2 BHK ઘર મળશે અને પાર્કિંગ પણ છે. चौबीस धन्यवाद.");
+    const { llm } = scripted("2 BHK ઘર મળશે અને પાર્કિંગ પણ છે. धन्यवाद.");
 
     const turn = await respond(conversation.id, "પાર્કિંગ મળશે?", llm);
 
@@ -151,6 +150,16 @@ describe("a stray word in another script", () => {
     const stored = await db.select().from(chatMessages).where(eq(chatMessages.conversationId, conversation.id));
     expect(stored.at(-1)?.content).toBe(turn.reply);
     expect(stored.at(-1)?.blockedDraft).toBeNull();
+  });
+
+  it("stays in the text unless it is a courtesy word, so the checks still see it", async () => {
+    const { conversation } = await setup();
+    // "चौबीस" fails the number check, which proves it was not quietly removed along with "धन्यवाद".
+    const { llm } = scripted("2 BHK ઘર મળશે અને પાર્કિંગ પણ છે. चौबीस धन्यवाद.");
+
+    await respond(conversation.id, "પાર્કિંગ મળશે?", llm);
+
+    expect((await conversationRow(conversation.id)).flagReason).toBe("unsupported_number");
   });
 });
 

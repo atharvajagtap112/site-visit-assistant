@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "../db";
 import { leads, messages, slots, visits } from "../db/schema";
 
@@ -54,6 +54,31 @@ async function isOptedOut(tx: Tx, lead: typeof leads.$inferSelect) {
   return Boolean(other);
 }
 
+/**
+ * A past visit nobody recorded must not lock the buyer out, since "booked" is what the double-booking
+ * indexes count. Assumption: if the buyer is booking again and staff never recorded the visit, they
+ * most likely did not come, so it closes as no_show. Staff can correct that from lead detail.
+ */
+async function closeStaleVisits(tx: Tx, lead: typeof leads.$inferSelect) {
+  await tx
+    .update(visits)
+    .set({ status: "no_show" })
+    .from(slots)
+    .where(
+      and(
+        eq(slots.id, visits.slotId),
+        eq(visits.status, "booked"),
+        lte(slots.startsAt, sql`now()`),
+        inArray(
+          visits.leadId,
+          lead.phone
+            ? tx.select({ id: leads.id }).from(leads).where(eq(leads.phone, lead.phone))
+            : [lead.id],
+        ),
+      ),
+    );
+}
+
 /** One person, one upcoming visit, even when they have enquired more than once. */
 async function phoneHasActiveVisit(tx: Tx, phone: string) {
   const [active] = await tx
@@ -74,12 +99,11 @@ async function bookInTx(tx: Tx, slotId: number, leadId: number): Promise<Booking
   const [lead] = await tx.select().from(leads).where(eq(leads.id, leadId));
   if (!lead) return { ok: false, reason: "lead_not_found" };
   if (await isOptedOut(tx, lead)) return { ok: false, reason: "opted_out" };
-  if (lead.phone) {
-    // The unique index is per lead, so two enquiries from one phone are kept apart by this lock.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lead.phone}))`);
-    if (await phoneHasActiveVisit(tx, lead.phone)) return { ok: false, reason: "already_booked" };
-  }
   if (!lead.consentAt) return { ok: false, reason: "no_consent" };
+  // The unique index is per lead, so two enquiries from one phone are kept apart by this lock.
+  if (lead.phone) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lead.phone}))`);
+  await closeStaleVisits(tx, lead);
+  if (lead.phone && (await phoneHasActiveVisit(tx, lead.phone))) return { ok: false, reason: "already_booked" };
 
   // The partial unique indexes decide the winner. A concurrent insert waits for the
   // other transaction to finish, then inserts nothing if that one committed.
@@ -167,6 +191,44 @@ export async function rescheduleVisit(visitId: number, newSlotId: number): Promi
     if (code === "40P01") return { ok: false, reason: "slot_taken" };
     throw e;
   }
+}
+
+export type ShowUp = "visited" | "no_show";
+export type ShowUpFailure = "visit_not_found" | "visit_in_future" | "already_recorded";
+
+/** Records who came. Only a booked visit whose time has passed can be recorded, and only once. */
+export async function recordShowUp(
+  visitId: number,
+  outcome: ShowUp,
+): Promise<{ ok: true } | { ok: false; reason: ShowUpFailure }> {
+  const [recorded] = await db
+    .update(visits)
+    .set({ status: outcome })
+    .from(slots)
+    .where(
+      and(
+        eq(visits.id, visitId),
+        eq(visits.status, "booked"),
+        eq(slots.id, visits.slotId),
+        lte(slots.startsAt, sql`now()`),
+      ),
+    )
+    .returning({ id: visits.id });
+  if (recorded) return { ok: true };
+
+  const [visit] = await db.select({ status: visits.status }).from(visits).where(eq(visits.id, visitId));
+  if (!visit || visit.status === "cancelled") return { ok: false, reason: "visit_not_found" };
+  return { ok: false, reason: visit.status === "booked" ? "visit_in_future" : "already_recorded" };
+}
+
+/** Staff make mistakes: flips visited to no_show or back. Returns false for any other status. */
+export async function correctShowUp(visitId: number, outcome: ShowUp) {
+  const corrected = await db
+    .update(visits)
+    .set({ status: outcome })
+    .where(and(eq(visits.id, visitId), eq(visits.status, outcome === "visited" ? "no_show" : "visited")))
+    .returning({ id: visits.id });
+  return corrected.length === 1;
 }
 
 /** Stops all further contact with this person: every lead with their phone, every pending message. */

@@ -116,6 +116,7 @@ export async function getBuyerState(leadId: number) {
         lead.phone ? or(eq(visits.leadId, leadId), eq(leads.phone, lead.phone)) : eq(visits.leadId, leadId),
       ),
     )
+    .orderBy(desc(slots.startsAt))
     .limit(1);
 
   const pending = visit

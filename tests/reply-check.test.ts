@@ -285,13 +285,12 @@ describe("dropStrayScript", () => {
     ["તમારી વિનંતી મળી ગઈ, धन्यवाद।", "તમારી વિનંતી મળી ગઈ."],
     ["તમારી વિનંતી મળી ગઈ धन्यवाद।", "તમારી વિનંતી મળી ગઈ."],
     ["धन्यवाद! Project 1 માં 2 BHK ઘર મળશે અને પાર્કિંગ પણ છે.", "Project 1 માં 2 BHK ઘર મળશે અને પાર્કિંગ પણ છે."],
-    ["Project 1 માં कृपया 2 BHK ઘર છે.", "Project 1 માં 2 BHK ઘર છે."],
+    ["તમારી વિનંતી મળી ગઈ છે અને પાર્કિંગ પણ છે. नमस्ते शुक्रिया", "તમારી વિનંતી મળી ગઈ છે અને પાર્કિંગ પણ છે."],
     ["Project 1 (धन्यवाद) માં ઘર મળશે અને પાર્કિંગ પણ છે.", "Project 1 માં ઘર મળશે અને પાર્કિંગ પણ છે."],
     ["Project 1 માં ઘર મળશે અને પાર્કિંગ પણ છે - धन्यवाद", "Project 1 માં ઘર મળશે અને પાર્કિંગ પણ છે"],
     ["Project 1 માં ઘર છે.\nआभार\nપાર્કિંગ મળશે.", "Project 1 માં ઘર છે.\nપાર્કિંગ મળશે."],
     ["Project 1 में पार्किंग है। આભાર.", "Project 1 में पार्किंग है।"],
-    ["BHKवाला ઘર Project 1 માં છે.", "BHK ઘર Project 1 માં છે."],
-    ["૨ BHK ઘર ६५ लाख લાખથી શરૂ થાય છે.", "૨ BHK ઘર ६५ લાખથી શરૂ થાય છે."],
+    ["धन्यवाद, આ ઘરમાં પાર્કિંગ नहीं છે.", "આ ઘરમાં પાર્કિંગ नहीं છે."],
   ])("cleans %s", (reply, cleaned) => {
     expect(dropStrayScript(reply)).toBe(cleaned);
   });
@@ -302,6 +301,16 @@ describe("dropStrayScript", () => {
     "પ્રોજેક્ટ 2 માં  ઘર છે .",
     "आभा આભા",
     "",
+    // A stray negative must survive: removing it would reverse the sentence.
+    "આ ઘરમાં પાર્કિંગ नहीं છે.",
+    "प्रोजेक्ट 1 में पार्किंग નહીં है।",
+    // Mixed text that is not on the allow-list, including a longer word that starts with one.
+    "Project 1 માં कृपया 2 BHK ઘર છે.",
+    "BHKवाला ઘર Project 1 માં છે.",
+    "૨ BHK ઘર ६५ लाख લાખથી શરૂ થાય છે.",
+    "Project 1 માં ઘર મળશે, आभारी हूं.",
+    // No courtesy word, so nothing else about the text is tidied either.
+    "આ ઘર () Project 1 માં नहीं છે.",
   ])("leaves %s untouched", (reply) => {
     expect(dropStrayScript(reply)).toBe(reply);
   });

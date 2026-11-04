@@ -1,8 +1,8 @@
-import { sql } from "drizzle-orm";
-import { hashPassword } from "../lib/auth";
-import { bookVisit } from "../lib/booking";
+import { eq, sql } from "drizzle-orm";
+import { hashPassword, hashToken } from "../lib/auth";
+import { bookVisit, optOut } from "../lib/booking";
 import { db, pool } from "./index";
-import { facts, leads, projects, slots, users, visits } from "./schema";
+import { chatMessages, conversations, facts, leads, messages, projects, slots, users, visits } from "./schema";
 
 // The seed wipes every table, so it needs an explicit go-ahead on anything but a local database.
 const { hostname } = new URL(process.env.DATABASE_URL!);
@@ -184,5 +184,137 @@ for (const lead of inserted) {
   }
 }
 
+// The brief's visits were inserted directly, so their simulated messages are added here.
+const [hardikVisit] = await db.select().from(visits).where(eq(visits.leadId, hardik.id));
+await db.insert(messages).values([
+  { leadId: hardik.id, visitId: hardikVisit.id, kind: "confirmation", sendAt: new Date(hardikCreatedAt.getTime() + 5 * 60_000) },
+  { leadId: hardik.id, visitId: hardikVisit.id, kind: "reminder_1d", sendAt: new Date(hardikSlot.startsAt.getTime() - DAY) },
+  { leadId: hardik.id, visitId: hardikVisit.id, kind: "reminder_2h", sendAt: new Date(hardikSlot.startsAt.getTime() - 2 * 60 * 60 * 1000) },
+]);
+
+// Named cases for the staff screens, so each state can be found on purpose. Riya owns one of each.
+const [riya, jay, pooja] = executives;
+const ago = (days: number) => new Date(Date.now() - days * DAY);
+const scenario = (id: number, name: string, days: number, assignedTo: number, extra: Partial<typeof leads.$inferInsert> = {}) => ({
+  id,
+  name,
+  source: "property_portal" as const,
+  projectId: project1.id,
+  wants: "3 BHK",
+  status: "contacted" as const,
+  assignedToId: assignedTo,
+  consentAt: ago(days),
+  createdAt: ago(days),
+  firstResponseAt: new Date(ago(days).getTime() + 120_000),
+  ...extra,
+});
+
+await db.insert(leads).values([
+  // Same phone with a stored link, as saveContact and Add lead make them.
+  scenario(58401, "Hetal Amin", 9, riya.id, { phone: "+919000070001", budget: "₹80 lakh" }),
+  scenario(58402, "Hetal Amin", 3, riya.id, { phone: "+919000070001", source: "social_ad", duplicateOfId: 58401 }),
+  // Same phone with no stored link, as an import might leave them.
+  scenario(58403, "Tejas Rana", 6, jay.id, { phone: "+919000070002", projectId: project2.id, wants: "2 BHK" }),
+  scenario(58404, "T. Rana", 2, jay.id, { phone: "+919000070002", projectId: project2.id, wants: "2 BHK", source: "website" }),
+  // Opted out before and after booking. optOut below stamps Sagar and cancels his reminders.
+  scenario(58405, "Komal Vora", 8, riya.id, { phone: "+919000070003", optedOutAt: ago(1) }),
+  scenario(58406, "Sagar Dave", 5, pooja.id, { phone: "+919000070004" }),
+  // Handoffs: the button and an outage store no summary, the model's own tool stores one.
+  scenario(58407, "Bhavna Modi", 4, riya.id, { phone: "+919000070005", language: "hi", budget: "₹90 lakh" }),
+  scenario(58408, "Nirav Jani", 3, jay.id, { phone: "+919000070006", wants: "2 BHK" }),
+  scenario(58409, "Jinal Bhatt", 1, pooja.id, { phone: "+919000070007", language: "gu", wants: "2 BHK", projectId: project2.id }),
+  // The reply check withheld a draft here.
+  scenario(58410, "Manish Parikh", 2, riya.id, { phone: "+919000070008", budget: "₹70 lakh", wants: "2 BHK" }),
+  // New, no reply yet and no consent yet, so booking asks for consent first.
+  scenario(58411, "Priya Solanki", 0.2, riya.id, { phone: "+919000070009", source: "hoarding_call", status: "new", consentAt: null, firstResponseAt: null }),
+  // A chat that has not reached a project or a person yet.
+  scenario(58412, "Rohan Gandhi", 0.5, riya.id, { phone: "+919000070010", source: "website", status: "new", projectId: null, wants: null, firstResponseAt: null }),
+]);
+
+for (const leadId of [58402, 58406]) {
+  const booked = await bookVisit(takeSlot(project1.id, 2, 14).id, leadId);
+  if (!booked.ok) throw new Error(`Seed booking failed: ${booked.reason}`);
+}
+await optOut(58406);
+
+const CHATS: {
+  leadId: number;
+  handoffReason?: string;
+  summary?: string;
+  flagReason?: string;
+  lines: { role: "buyer" | "assistant"; content: string; blockedDraft?: string }[];
+}[] = [
+  {
+    leadId: 58407,
+    handoffReason: "Buyer asked for a person",
+    lines: [
+      { role: "buyer", content: "क्या 3 BHK में पार्किंग मिलती है?" },
+      { role: "assistant", content: "हां, Project 1 में हर घर के साथ एक कवर्ड पार्किंग मिलती है।" },
+      { role: "buyer", content: "ठीक है, मुझे किसी से फोन पर बात करनी है।" },
+    ],
+  },
+  {
+    leadId: 58408,
+    handoffReason: "Buyer wants to know about home loans",
+    summary: "Wants a 2 BHK in Project 1 and asked which banks give home loans. Prefers a call in the evening.",
+    lines: [
+      { role: "buyer", content: "Which banks give a home loan for this project?" },
+      { role: "assistant", content: "I do not have that detail. Our sales team can help you with it." },
+    ],
+  },
+  {
+    leadId: 58409,
+    handoffReason: "Assistant unavailable",
+    lines: [{ role: "buyer", content: "2 BHK ની કિંમત શું છે?" }],
+  },
+  {
+    leadId: 58410,
+    handoffReason: "Reply withheld: discount",
+    flagReason: "discount",
+    lines: [
+      { role: "buyer", content: "Can you give me a better price if I book this week?" },
+      {
+        role: "assistant",
+        content: "I am not able to answer that here. A person from our sales team will help you.",
+        blockedDraft: "Yes, we can offer a special discount if you book this week.",
+      },
+    ],
+  },
+  {
+    leadId: 58412,
+    lines: [
+      { role: "buyer", content: "Do you have homes near the ring road?" },
+      { role: "assistant", content: "Both projects are in Ahmedabad. Would you like to book a site visit?" },
+    ],
+  },
+];
+
+for (const chat of CHATS) {
+  const [lead] = await db.select().from(leads).where(eq(leads.id, chat.leadId));
+  const startedAt = lead.createdAt.getTime() + 60_000;
+  const handedOffAt = chat.handoffReason ? new Date(startedAt + chat.lines.length * 60_000) : null;
+  const [conversation] = await db
+    .insert(conversations)
+    .values({
+      // Not a real token: nobody can sign in as this chat.
+      tokenHash: hashToken(`seed-chat-${chat.leadId}`),
+      leadId: chat.leadId,
+      handedOffAt,
+      handoffReason: chat.handoffReason,
+      summary: chat.summary,
+      flaggedAt: chat.flagReason ? handedOffAt : null,
+      flagReason: chat.flagReason,
+      createdAt: new Date(startedAt),
+    })
+    .returning();
+  await db.insert(chatMessages).values(
+    chat.lines.map((line, i) => ({
+      conversationId: conversation.id,
+      ...line,
+      createdAt: new Date(startedAt + i * 60_000),
+    })),
+  );
+}
+
 await pool.end();
-console.log(`Seeded ${staff.length} staff, ${inserted.length + 3} leads, ${slotRows.length} slots`);
+console.log(`Seeded ${staff.length} staff, ${inserted.length + 15} leads, ${slotRows.length} slots`);

@@ -4,7 +4,7 @@ import { LanguagePicker } from "@/components/language-picker";
 import { MapLink } from "@/components/map-link";
 import { PhoneSignIn } from "@/components/phone-sign-in";
 import { primaryButton } from "@/components/ui";
-import { OptOut, VisitActions } from "@/components/visit-actions";
+import { BookAgain, OptOut, VisitActions } from "@/components/visit-actions";
 import { getBuyerState } from "@/lib/buyer";
 import { getConversation } from "@/lib/buyer-session";
 import { formatVisitTime } from "@/lib/format";
@@ -22,7 +22,8 @@ export default async function VisitPage({ searchParams }: { searchParams: Promis
   const state = conversation ? await getBuyerState(conversation.leadId) : null;
   const visit = state?.visit;
   const isPast = visit ? visit.startsAt <= new Date() : false;
-  const notice = done === "changed" ? t.visitChanged : done === "cancelled" ? t.visitCancelled : null;
+  const notices: Record<string, string> = { changed: t.visitChanged, cancelled: t.visitCancelled, booked: t.visitBooked };
+  const notice = done && Object.hasOwn(notices, done) ? notices[done] : null;
 
   return (
     <div lang={language} className="mx-auto min-h-dvh max-w-2xl px-5 py-5 sm:px-8">
@@ -60,7 +61,12 @@ export default async function VisitPage({ searchParams }: { searchParams: Promis
             )}
 
             {isPast ? (
-              <p className="mt-8 rounded-md bg-amber-soft px-3 py-2 text-amber">{t.visitPastNote}</p>
+              <>
+                <p className="mt-8 rounded-md bg-amber-soft px-3 py-2 text-amber">{t.visitPastNote}</p>
+                <div className="mt-5">
+                  <BookAgain language={language} project={visit.slug} />
+                </div>
+              </>
             ) : (
               <>
                 <section className="mt-8">

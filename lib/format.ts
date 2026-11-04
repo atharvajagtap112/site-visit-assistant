@@ -1,4 +1,4 @@
-import type { leadSourceEnum, visitStatusEnum } from "../db/schema";
+import type { languageEnum, leadSourceEnum, leadStatusEnum, messageKindEnum, visitStatusEnum } from "../db/schema";
 
 type LeadSource = (typeof leadSourceEnum.enumValues)[number];
 type VisitStatus = (typeof visitStatusEnum.enumValues)[number];
@@ -9,6 +9,46 @@ export const SOURCE_LABELS: Record<LeadSource, string> = {
   website: "Website",
   hoarding_call: "Hoarding call",
 };
+
+export const STATUS_LABELS: Record<(typeof leadStatusEnum.enumValues)[number], string> = {
+  new: "New",
+  contacted: "Contacted",
+  closed: "Closed",
+};
+
+export const LANGUAGE_LABELS: Record<(typeof languageEnum.enumValues)[number], string> = {
+  en: "English",
+  hi: "Hindi",
+  gu: "Gujarati",
+};
+
+export const MESSAGE_KIND_LABELS: Record<(typeof messageKindEnum.enumValues)[number], string> = {
+  confirmation: "Booking confirmation",
+  reminder_1d: "Reminder, 1 day before",
+  reminder_2h: "Reminder, 2 hours before",
+};
+
+/** Keyed by the reply check's failure names, which are also stored as the flag reason. */
+const FLAG_LABELS: Record<string, string> = {
+  discount: "it talked about a discount or offer",
+  internals: "it showed internal system details",
+  unsupported_number: "it used a number that is not on the fact sheet",
+  unsupported_price: "it used a price that is not on the fact sheet",
+};
+
+export const flagLabel = (reason: string | null) => (reason && FLAG_LABELS[reason]) ?? "the safety check stopped it";
+
+/** Stored reasons are short codes or notes for staff, so only the withheld-reply form needs rewording. */
+export const handoffLabel = (reason: string | null) => {
+  if (!reason) return "No reason recorded";
+  const withheld = /^Reply withheld: (\w+)$/.exec(reason);
+  return withheld ? `Reply withheld because ${flagLabel(withheld[1])}` : reason;
+};
+
+export function messageState(message: { sendAt: Date; cancelledAt: Date | null }, now = new Date()) {
+  if (message.cancelledAt) return "Cancelled";
+  return message.sendAt <= now ? "Sent" : "Pending";
+}
 
 const visitTime = new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata",
