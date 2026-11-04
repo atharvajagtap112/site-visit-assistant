@@ -15,8 +15,8 @@ import { hashToken } from "./auth";
 import { buildSystemPrompt, CANNED, TOOLS, type Language } from "./assistant-prompt";
 import { bookVisit, getFreeSlots } from "./booking";
 import { formatVisitTime } from "./format";
-import { gemini, type Llm } from "./llm";
-import { checkReply, mentionsDiscount, normalise, promisesPerson } from "./reply-check";
+import { chatModel, type Llm } from "./llm";
+import { checkReply, dropStrayScript, mentionsDiscount, normalise, promisesPerson } from "./reply-check";
 
 const MAX_TOOL_ROUNDS = 4;
 const TURN_BUDGET_MS = 75_000;
@@ -36,9 +36,11 @@ export type ChatTurn = { reply: string; cards: ChatCard[]; aiAvailable: boolean 
 
 /** A buyer may type their number into the chat anyway. It stays with us and never reaches the model. */
 export const redactPhones = (text: string) =>
-  normalise(text).replace(/(?:\+?91[\s-]*)?(?<!\d)[6-9](?:[\s-]*\d){9}(?!\d)/g, "[phone number removed]");
+  normalise(text).replace(/(?<!\d)(?:\+?91|0)?[\s().-]*[6-9](?:[\s().-]*\d){9}(?!\d)/g, " [phone number removed]");
 
 const indiaDate = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+// Models add the year to a time they repeat, and the reply check only passes numbers a tool gave.
+const indiaYear = (date: Date) => indiaDate(date).slice(0, 4);
 
 export async function startConversation(
   token: string,
@@ -156,9 +158,10 @@ async function runTool(
       const offered = onDate.slice(0, SLOTS_OFFERED).map((s) => ({
         id: s.id,
         label: formatVisitTime(s.startsAt),
+        year: indiaYear(s.startsAt),
       }));
-      if (offered.length) cards.push({ type: "slots", slots: offered });
-      return { free_slots: offered.map((s) => ({ slot_id: s.id, time: s.label })) };
+      if (offered.length) cards.push({ type: "slots", slots: offered.map(({ id, label }) => ({ id, label })) });
+      return { free_slots: offered.map((s) => ({ slot_id: s.id, time: s.label, year: s.year })) };
     }
 
     case "book_visit": {
@@ -181,12 +184,12 @@ async function runTool(
           reraNumber: row.project.reraNumber,
           mapUrl: row.project.mapUrl,
         });
-        return { result: "booked", time: label, project: row.project.name };
+        return { result: "booked", time: label, year: indiaYear(row.startsAt), project: row.project.name };
       }
       // A chat buyer has not given a name, number or consent yet. The form collects them.
       if (result.reason === "no_consent") {
         cards.push({ type: "contact_needed", slotId, label });
-        return { result: "details_needed", time: label };
+        return { result: "details_needed", time: label, year: indiaYear(row.startsAt) };
       }
       return { result: result.reason };
     }
@@ -223,7 +226,7 @@ async function runTool(
 export async function respond(
   conversationId: number,
   buyerText: string,
-  llm: Llm = gemini,
+  llm: Llm = chatModel,
 ): Promise<ChatTurn> {
   const [conversation] = await db.select().from(conversations).where(eq(conversations.id, conversationId));
   const [lead] = await db.select().from(leads).where(eq(leads.id, conversation.leadId));
@@ -242,7 +245,9 @@ export async function respond(
       .update(leads)
       .set({ firstResponseAt: new Date() })
       .where(and(eq(leads.id, lead.id), isNull(leads.firstResponseAt)));
-    return { reply, cards, aiAvailable };
+    // Chat history keeps no slot IDs, so the model looks them up again to book. A chosen time needs no list.
+    const chosen = cards.some((c) => c.type === "contact_needed" || c.type === "booked");
+    return { reply, cards: chosen ? cards.filter((c) => c.type !== "slots") : cards, aiAvailable };
   };
 
   const handOffCard = async (reason: string): Promise<ChatCard> => ({
@@ -318,6 +323,7 @@ export async function respond(
   }
 
   if (!text) return unavailable();
+  text = dropStrayScript(text);
 
   const failure = checkReply(text, factSheet, toolOutput.join("\n"));
   if (failure) {

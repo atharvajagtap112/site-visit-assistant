@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkReply, normalise } from "../lib/reply-check";
+import { checkReply, dropStrayScript, normalise, promisesPerson } from "../lib/reply-check";
 
 const FACTS = "Project 2 has 2 BHK homes from ₹65 lakh. Prices range up to ₹1.2 crore. 420 homes.";
 
@@ -140,6 +140,81 @@ describe("discounts", () => {
   );
 });
 
+describe("internals", () => {
+  it.each([
+    '{"result":"handed_off","salesperson":"Riya Mehta"}',
+    '{"reason":"Buyer asked for a discount","summary":"Wants a lower price"}',
+    'I have noted that. {"result":"saved"}',
+    '"result":"handed_off"',
+    "{ result: saved",
+    "Please send me the slot_id you prefer.",
+    "Please tell me the slot ID you prefer.",
+    "Which project_slug do you want?",
+    "I will call handoff_to_human now.",
+    "get_free_slots shows nothing today.",
+    "Calling book_visit.",
+    "I ran save_buyer_needs.",
+    "Sat, 8 Nov, 11:00 am (ID: 57)",
+    "Slot 57 is free.",
+    "Slot #57: Saturday morning.",
+    "स्लॉट आईडी बताइए।",
+    "સ્લોટ આઈડી જણાવો.",
+  ])("withholds %s", (reply) => {
+    expect(checkReply(reply, FACTS)).toBe("internals");
+  });
+
+  const TOOL = '{"free_slots":[{"slot_id":57,"time":"Sat, 8 Nov, 11:00 am"},{"slot_id":8,"time":"Sat, 8 Nov, 2:00 pm"}]}';
+
+  it("withholds a slot ID even though the tool returned it", () => {
+    expect(checkReply("57 is free on Saturday.", FACTS, TOOL)).toBe("internals");
+  });
+
+  it.each([
+    "Free times appear as buttons below the chat.",
+    "Sat, 8 Nov, 11:00 am is free.",
+    "The slot at 11:00 am on 8 Nov is free.",
+    "The slot 11:00 am is free.",
+    "Slot 8 Nov is free.",
+    "Please pick a time slot below.",
+    "You can book a visit below.",
+    "Please provide a valid ID when you visit.",
+    'Project 2 is called "the garden homes".',
+  ])("lets through %s", (reply) => {
+    expect(checkReply(reply, FACTS, TOOL)).toBeNull();
+  });
+});
+
+describe("implied offers", () => {
+  it.each([
+    "A sales specialist will discuss pricing and any offers.",
+    "A person will confirm pricing and offers.",
+    "Offers are available this month.",
+    "We have offers for you.",
+    "We may have some offers.",
+    "There are special offers.",
+    "Is there an offer running?",
+    "Ask about current deals.",
+    "A person will explain the payment scheme.",
+    "Special pricing applies this week.",
+    "कोई ऑफ़र हो तो टीम बताएगी।",
+    "ઑફર વિશે ટીમ જણાવશે.",
+  ])("withholds %s", (reply) => {
+    expect(checkReply(reply, FACTS)).toBe("discount");
+  });
+
+  it.each([
+    "We offer 2 BHK homes.",
+    "Project 2 offers 2 BHK homes and a gym.",
+    "Project 2 has a gym and offers 2 BHK homes.",
+    "Each home offers one parking space.",
+    "We are offering 2 BHK homes.",
+    "A person from our sales team will confirm pricing.",
+    "A person will deal with this.",
+  ])("lets through %s", (reply) => {
+    expect(checkReply(reply, FACTS)).toBeNull();
+  });
+});
+
 describe("other numbers", () => {
   it.each([
     "The tower has 24 floors.",
@@ -201,5 +276,77 @@ describe("more wording", () => {
 
   it("normalises digits in tool output", () => {
     expect(checkReply("Free on 8 Nov.", FACTS, "૮ Nov")).toBeNull();
+  });
+});
+
+describe("dropStrayScript", () => {
+  it.each([
+    ["એક સહકર્મી જલ્દી જ તમારી વિનંતી વિશે સંપર્ક કરશે. धन्यवाद.", "એક સહકર્મી જલ્દી જ તમારી વિનંતી વિશે સંપર્ક કરશે."],
+    ["તમારી વિનંતી મળી ગઈ, धन्यवाद।", "તમારી વિનંતી મળી ગઈ."],
+    ["તમારી વિનંતી મળી ગઈ धन्यवाद।", "તમારી વિનંતી મળી ગઈ."],
+    ["धन्यवाद! Project 1 માં 2 BHK ઘર મળશે અને પાર્કિંગ પણ છે.", "Project 1 માં 2 BHK ઘર મળશે અને પાર્કિંગ પણ છે."],
+    ["Project 1 માં कृपया 2 BHK ઘર છે.", "Project 1 માં 2 BHK ઘર છે."],
+    ["Project 1 (धन्यवाद) માં ઘર મળશે અને પાર્કિંગ પણ છે.", "Project 1 માં ઘર મળશે અને પાર્કિંગ પણ છે."],
+    ["Project 1 માં ઘર મળશે અને પાર્કિંગ પણ છે - धन्यवाद", "Project 1 માં ઘર મળશે અને પાર્કિંગ પણ છે"],
+    ["Project 1 માં ઘર છે.\nआभार\nપાર્કિંગ મળશે.", "Project 1 માં ઘર છે.\nપાર્કિંગ મળશે."],
+    ["Project 1 में पार्किंग है। આભાર.", "Project 1 में पार्किंग है।"],
+    ["BHKवाला ઘર Project 1 માં છે.", "BHK ઘર Project 1 માં છે."],
+    ["૨ BHK ઘર ६५ लाख લાખથી શરૂ થાય છે.", "૨ BHK ઘર ६५ લાખથી શરૂ થાય છે."],
+  ])("cleans %s", (reply, cleaned) => {
+    expect(dropStrayScript(reply)).toBe(cleaned);
+  });
+
+  it.each([
+    "Project 1 has 2 BHK homes  ,  from ₹65 lakh!?",
+    "प्रोजेक्ट 1 में  2 BHK घर हैं ।",
+    "પ્રોજેક્ટ 2 માં  ઘર છે .",
+    "आभा આભા",
+    "",
+  ])("leaves %s untouched", (reply) => {
+    expect(dropStrayScript(reply)).toBe(reply);
+  });
+});
+
+describe("promisesPerson", () => {
+  it.each([
+    "A sales specialist will confirm this.",
+    "A dedicated specialist can help.",
+    "Our representative will explain.",
+    "A sales rep will explain.",
+    "An advisor will help you.",
+    "An adviser will help you.",
+    "A colleague will get back to you.",
+    "Our consultant will help.",
+    "We will contact you soon.",
+    "We'll call you tomorrow.",
+    "Someone will confirm that.",
+    "हमारे सहकर्मी आपको बताएंगे।",
+    "एक प्रतिनिधि आपको बताएगा।",
+    "हमारे विशेषज्ञ आपको बताएंगे।",
+    "हमारे सलाहकार आपको बताएंगे।",
+    "सेल्स एग्ज़ीक्यूटिव आपको बताएगा।",
+    "हम जल्द ही संपर्क करेंगे।",
+    "એક સહકર્મી તમને જણાવશે.",
+    "અમારા પ્રતિનિધિ તમને જણાવશે.",
+    "અમારા નિષ્ણાત તમને જણાવશે.",
+    "અમારા સલાહકાર તમને જણાવશે.",
+    "ટીમ ટૂંક સમયમાં સંપર્ક કરશે.",
+  ])("hears the promise in %s", (reply) => {
+    expect(promisesPerson(reply)).toBe(true);
+  });
+
+  it.each([
+    "Project 1 has 3 BHK homes, a clubhouse and 24-hour security.",
+    "One covered parking space comes with each home.",
+    "There is a specialist hospital nearby.",
+    "The site has security staff all day.",
+    "Site visits are free of charge, between 10 am and 5 pm.",
+    "प्रोजेक्ट 1 में हर घर के साथ पार्किंग मिलती है।",
+    "पास में विशेषज्ञ अस्पताल है।",
+    "પ્રોજેક્ટ 2 માં જિમ અને બગીચો છે.",
+    "દરેક ઘર સાથે પાર્કિંગ મળે છે.",
+    "તમે નીચે મુલાકાતનો સમય પસંદ કરી શકો છો.",
+  ])("hears no promise in %s", (reply) => {
+    expect(promisesPerson(reply)).toBe(false);
   });
 });

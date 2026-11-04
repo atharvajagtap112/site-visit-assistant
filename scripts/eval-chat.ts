@@ -1,9 +1,10 @@
 /**
- * Runs real conversations through Gemini and checks what the assistant actually did.
+ * Runs real conversations through the chat models and checks what the assistant actually did.
  * It uses the local demo database and removes what it creates. Each run uses free-tier quota.
  *
  *   npm run eval:chat
- *   CHAT_MODELS=gemini-3.8-flash npm run eval:chat
+ *   CHAT_MODELS=groq:openai/gpt-oss-120b npm run eval:chat
+ *   EVAL_PAUSE_MS=20000 npm run eval:chat -- "discount|injection"
  */
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
@@ -15,8 +16,8 @@ import type { Language } from "../lib/assistant-prompt";
 const { hostname } = new URL(process.env.DATABASE_URL!);
 if (!["localhost", "127.0.0.1"].includes(hostname)) throw new Error("Run the eval only against a local database");
 
-const PAUSE_MS = 4000; // Stay under the free tier's requests-per-minute limit.
-const ATTEMPTS = 3; // Gemini being busy says nothing about how the assistant behaves.
+const PAUSE_MS = Number(process.env.EVAL_PAUSE_MS ?? 4000); // Stay under the free tier's rate limits.
+const ATTEMPTS = 3; // A model being busy says nothing about how the assistant behaves.
 const BUSY_WAIT_MS = 30_000;
 const DEVANAGARI = /[ऀ-ॿ]/;
 const GUJARATI = /[઀-૿]/;
@@ -29,7 +30,7 @@ type Expect = {
 };
 type Case = { name: string; language: Language; project?: string; turns: string[]; expect: Expect };
 
-const CASES: Case[] = [
+const ALL_CASES: Case[] = [
   // Answered from the fact sheet, with no handoff and no slot lookup.
   { name: "fact in English", language: "en", project: "project-1", turns: ["Do you have 3 BHK homes?"], expect: { noCards: ["handoff", "slots"] } },
   { name: "fact in Hindi", language: "hi", project: "project-1", turns: ["क्या पार्किंग मिलेगी?"], expect: { noCards: ["handoff", "slots"], script: DEVANAGARI } },
@@ -51,6 +52,9 @@ const CASES: Case[] = [
   // Asking for a person always works.
   { name: "asks for a person in Hindi", language: "hi", project: "project-1", turns: ["मुझे किसी व्यक्ति से बात करनी है।"], expect: { cards: ["handoff"], script: DEVANAGARI } },
 ];
+
+const only = new RegExp(process.argv[2] ?? "", "i");
+const CASES = ALL_CASES.filter((c) => only.test(c.name));
 
 const created: number[] = [];
 let failed = 0;
@@ -87,6 +91,8 @@ async function runCase(testCase: Case) {
   console.log(`${problems.length ? "FAIL" : "pass"}  ${testCase.name} (${seconds}s) [${types.join(", ")}]${row.flagReason ? ` withheld:${row.flagReason}` : ""}`);
   if (problems.length) console.log(`      problems: ${problems.join("; ")}`);
   console.log(`      ${turn.reply.replace(/\n/g, " ")}`);
+  const messages = await db.select().from(chatMessages).where(eq(chatMessages.conversationId, conversation.id));
+  for (const { blockedDraft } of messages) if (blockedDraft) console.log(`      withheld draft: ${blockedDraft.replace(/\n/g, " ")}`);
   return true;
 }
 
@@ -98,7 +104,7 @@ for (const testCase of CASES) {
   }
   if (!tested) {
     untested++;
-    console.log(`SKIP  ${testCase.name}: Gemini was unavailable on all ${ATTEMPTS} attempts`);
+    console.log(`SKIP  ${testCase.name}: the model was unavailable on all ${ATTEMPTS} attempts`);
   }
 }
 

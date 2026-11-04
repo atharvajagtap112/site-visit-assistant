@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../db";
 import { chatMessages, conversations, facts, leads, users, visits } from "../db/schema";
-import { respond, startConversation, type ChatTurn } from "../lib/assistant";
+import { redactPhones, respond, startConversation, type ChatTurn } from "../lib/assistant";
 import { hashPassword } from "../lib/auth";
 import { tryModels, type Llm, type LlmResponse } from "../lib/llm";
 import { makeProject, makeSlot, resetDb } from "./helpers";
@@ -83,6 +83,48 @@ describe("safety check on replies", () => {
     expect((await conversationRow(conversation.id)).flagReason).toBe("unsupported_price");
   });
 
+  it("withholds raw tool JSON and still gives the buyer a person", async () => {
+    const { conversation } = await setup();
+    const json = '{"reason":"Wants a person","summary":"Wants a 2 BHK"}';
+
+    const turn = await respond(conversation.id, "Talk to a person", scripted(json).llm);
+
+    expect(turn.reply).not.toContain("summary");
+    expect(cardTypes(turn)).toEqual(["handoff"]);
+    const row = await conversationRow(conversation.id);
+    expect(row.flagReason).toBe("internals");
+    expect(row.handedOffAt).not.toBeNull();
+    const stored = await db.select().from(chatMessages).where(eq(chatMessages.conversationId, conversation.id));
+    expect(stored.at(-1)?.blockedDraft).toBe(json);
+  });
+
+  it("keeps the free times when a reply showing a slot ID is withheld", async () => {
+    const { conversation, project } = await setup();
+    const slot = await makeSlot(project.id);
+    const { llm } = scripted(
+      [{ name: "get_free_slots", args: { project_slug: "p" } }],
+      `Slot ID ${slot.id} is free.`,
+    );
+
+    const turn = await respond(conversation.id, "Can I visit?", llm);
+
+    expect(cardTypes(turn)).toEqual(["slots", "handoff"]);
+    expect((await conversationRow(conversation.id)).flagReason).toBe("internals");
+  });
+
+  it("does not add a second handoff when the tool already ran", async () => {
+    const { conversation } = await setup();
+    const { llm } = scripted(
+      [{ name: "handoff_to_human", args: { reason: "r", summary: "s" } }],
+      '{"result":"handed_off","salesperson":"Riya"}',
+    );
+
+    const turn = await respond(conversation.id, "Talk to a person", llm);
+
+    expect(cardTypes(turn)).toEqual(["handoff"]);
+    expect((await conversationRow(conversation.id)).flagReason).toBe("internals");
+  });
+
   it("lets a grounded reply through unchanged", async () => {
     const { conversation } = await setup();
     const turn = await respond(conversation.id, "Prices?", scripted("Homes start from ₹65 lakh.").llm);
@@ -90,6 +132,25 @@ describe("safety check on replies", () => {
     expect(turn.reply).toBe("Homes start from ₹65 lakh.");
     expect(turn.cards).toEqual([]);
     expect((await conversationRow(conversation.id)).flaggedAt).toBeNull();
+  });
+});
+
+describe("a stray word in another script", () => {
+  it("is removed before the checks, with no handoff or flag, and the buyer sees what was stored", async () => {
+    const { conversation } = await setup();
+    // "चौबीस" alone would fail the number check, so a pass proves the check saw the cleaned text.
+    const { llm } = scripted("2 BHK ઘર મળશે અને પાર્કિંગ પણ છે. चौबीस धन्यवाद.");
+
+    const turn = await respond(conversation.id, "પાર્કિંગ મળશે?", llm);
+
+    expect(turn.reply).toBe("2 BHK ઘર મળશે અને પાર્કિંગ પણ છે.");
+    expect(turn.cards).toEqual([]);
+    const row = await conversationRow(conversation.id);
+    expect(row.flagReason).toBeNull();
+    expect(row.handedOffAt).toBeNull();
+    const stored = await db.select().from(chatMessages).where(eq(chatMessages.conversationId, conversation.id));
+    expect(stored.at(-1)?.content).toBe(turn.reply);
+    expect(stored.at(-1)?.blockedDraft).toBeNull();
   });
 });
 
@@ -105,6 +166,39 @@ describe("booking through tools", () => {
     const turn = await respond(conversation.id, "Can I visit?", llm);
 
     expect(turn.cards).toMatchObject([{ type: "slots", slots: [{ id: slot.id }] }]);
+  });
+
+  it("shows only the chosen time when the model looks up slots again to book one", async () => {
+    const { project, conversation } = await setup();
+    const slot = await makeSlot(project.id);
+    const { llm } = scripted(
+      [{ name: "get_free_slots", args: { project_slug: project.slug } }],
+      [{ name: "book_visit", args: { slot_id: slot.id } }],
+      "Please fill in the short form below.",
+    );
+
+    const turn = await respond(conversation.id, "The first one please", llm);
+
+    expect(cardTypes(turn)).toEqual(["contact_needed"]);
+  });
+
+  it("lets the model say the year of a slot, but not a year nothing gave it", async () => {
+    const { project, conversation } = await setup();
+    const slot = await makeSlot(project.id);
+    const year = slot.startsAt.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }).slice(0, 4);
+    const reply = `To confirm your visit in ${year}, please fill in the short form below.`;
+
+    const turn = await respond(
+      conversation.id,
+      "That one please",
+      scripted([{ name: "book_visit", args: { slot_id: slot.id } }], reply).llm,
+    );
+    expect(turn.reply).toBe(reply);
+    expect(cardTypes(turn)).toEqual(["contact_needed"]);
+
+    const later = await respond(conversation.id, "When is possession?", scripted(`Possession is in ${year}.`).llm);
+    expect(later.reply).not.toContain(year);
+    expect((await conversationRow(conversation.id)).flagReason).toBe("unsupported_number");
   });
 
   it("asks for the form when the buyer has not consented, and books nothing", async () => {
@@ -179,6 +273,25 @@ describe("what reaches the model", () => {
     expect(stored[0].content).toContain("98765 43210");
   });
 
+  it.each([
+    "+919876543210",
+    "919876543210",
+    "09876543210",
+    "9876543210",
+    "+91 98765 43210",
+    "98765-43210",
+    "(98765) 43210",
+    "98765.43210",
+    "९८७६५४३२१०",
+    "૯૮૭૬૫૪૩૨૧૦",
+  ])("removes the phone number %s before the model sees it", (phone) => {
+    expect(redactPhones(`Call me on ${phone} please`)).not.toMatch(/\d{3}/);
+  });
+
+  it("leaves ordinary numbers alone", () => {
+    expect(redactPhones("I want 2 BHK, budget 65 lakh, on 12 Nov")).toBe("I want 2 BHK, budget 65 lakh, on 12 Nov");
+  });
+
   it("includes this project's facts and the earlier chat", async () => {
     const { conversation } = await setup();
     await respond(conversation.id, "First question", scripted("First answer.").llm);
@@ -200,6 +313,8 @@ describe("handoff", () => {
     "A person from our sales team will confirm this.",
     "हमारी सेल्स टीम आपको बताएगी।",
     "અમારી સેલ્સ ટીમ તમને જણાવશે.",
+    "A sales specialist will confirm this.",
+    "એક સહકર્મી તમને જણાવશે.",
   ])("keeps a promise the model made without calling the tool: %s", async (reply) => {
     const { conversation } = await setup();
 
