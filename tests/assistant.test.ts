@@ -9,6 +9,14 @@ import { makeProject, makeSlot, resetDb } from "./helpers";
 
 beforeEach(resetDb);
 
+it("creates one lead when parallel first requests share a token", async () => {
+  const made = await Promise.all(
+    Array.from({ length: 8 }, () => startConversation("same-token", { source: "website", language: "en" })),
+  );
+  expect(new Set(made.map((c) => c.leadId)).size).toBe(1);
+  expect(await db.select().from(leads)).toHaveLength(1);
+});
+
 type Call = { name: string; args: Record<string, unknown> };
 
 /** A model that follows a script: each entry is one response, either text or tool calls. */
@@ -55,6 +63,34 @@ async function setup(leadOverrides: Partial<typeof leads.$inferInsert> = {}) {
 const cardTypes = (turn: ChatTurn) => turn.cards.map((c) => c.type);
 const conversationRow = async (id: number) =>
   (await db.select().from(conversations).where(eq(conversations.id, id)))[0];
+
+describe("visit times", () => {
+  it("shows the buyer their language on the card, and gives the model English", async () => {
+    const { project, conversation } = await setup({ language: "hi" });
+    await makeSlot(project.id);
+    const { llm, seen } = scripted([{ name: "get_free_slots", args: { project_slug: project.slug } }], "ठीक है");
+
+    const turn = await respond(conversation.id, "विज़िट", llm);
+
+    const card = turn.cards.find((c) => c.type === "slots");
+    expect(card?.type === "slots" && card.slots[0].label).toMatch(/[ऀ-ॿ]/);
+    const toolResult = JSON.stringify(seen[1].contents.at(-1));
+    expect(toolResult).not.toMatch(/[ऀ-ॿ]/);
+    expect(toolResult).toMatch(/[0-9]+ [A-Z][a-z]{2}, /);
+  });
+
+  it("does the same when the model tries to book before details are given", async () => {
+    const { project, conversation } = await setup({ language: "gu", consentAt: null });
+    const slot = await makeSlot(project.id);
+    const { llm, seen } = scripted([{ name: "book_visit", args: { slot_id: slot.id } }], "બરાબર");
+
+    const turn = await respond(conversation.id, "બુક", llm);
+
+    const card = turn.cards.find((c) => c.type === "contact_needed");
+    expect(card?.type === "contact_needed" && card.label).toMatch(/[઀-૿]/);
+    expect(JSON.stringify(seen[1].contents.at(-1))).not.toMatch(/[઀-૿]/);
+  });
+});
 
 describe("safety check on replies", () => {
   it("replaces an invented discount, hands off, flags it and keeps the draft for review", async () => {

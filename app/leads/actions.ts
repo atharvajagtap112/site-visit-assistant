@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/action-form";
 import type { BookingFailure, ShowUpFailure } from "@/lib/booking";
+import { withoutNul } from "@/lib/format";
 import {
   bookForLead,
   cancelForLead,
@@ -14,6 +15,7 @@ import {
   newLeadSchema,
   reassignLead,
   recordConsent,
+  recordOptOut,
   recordShowUpForLead,
   rescheduleForLead,
   setLeadClosed,
@@ -136,6 +138,14 @@ export async function recordConsentAction(_: ActionState, form: FormData): Promi
   return result.ok ? null : { error: LEAD_ERRORS[result.reason] };
 }
 
+export async function recordOptOutAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const { user, data } = await parsed(leadOnly, form);
+  if (!data) return INVALID;
+  const result = await recordOptOut(user, data.leadId);
+  refresh(data.leadId);
+  return result.ok ? null : { error: LEAD_ERRORS[result.reason] };
+}
+
 export type NewLeadValues = Partial<Record<"name" | "phone" | "source" | "projectId" | "wants" | "budget" | "consent", string>>;
 
 export type NewLeadState = {
@@ -154,7 +164,9 @@ export async function createLeadAction(_: NewLeadState, form: FormData): Promise
     if (typeof value === "string") values[field] = value;
   }
 
-  const result = newLeadSchema.safeParse(Object.fromEntries(form));
+  const result = newLeadSchema.safeParse(
+    Object.fromEntries([...form].map(([key, value]) => [key, typeof value === "string" ? withoutNul(value) : value])),
+  );
   if (!result.success) {
     const fields = z.flattenError(result.error).fieldErrors as Record<string, string[] | undefined>;
     const errors = Object.fromEntries(Object.entries(fields).map(([field, messages]) => [field, messages?.[0]]));

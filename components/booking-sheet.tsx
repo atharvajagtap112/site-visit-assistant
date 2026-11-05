@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import type { Language, Strings } from "@/lib/i18n";
+import { requestError, type Language, type Strings } from "@/lib/i18n";
 import { MapLink } from "./map-link";
 import { postJson, primaryButton, secondaryButton, textInput } from "./ui";
 
@@ -22,6 +22,7 @@ export function BookingSheet({
   source,
   project,
   hasContact,
+  showCodes,
   startSlot,
   contactOnly,
   reschedule,
@@ -37,6 +38,7 @@ export function BookingSheet({
   source?: string;
   project: string;
   hasContact: boolean;
+  showCodes: boolean;
   startSlot?: Slot | null;
   contactOnly?: boolean;
   reschedule?: boolean;
@@ -46,6 +48,7 @@ export function BookingSheet({
   onTalkToPerson?: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const [step, setStep] = useState<Step>("times");
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [slotsFailed, setSlotsFailed] = useState(false);
@@ -98,6 +101,11 @@ export function BookingSheet({
     // Only when the sheet opens: later changes to these props must not restart the flow.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // Each step replaces the button that was just pressed, so focus moves to the new step's title.
+  useEffect(() => {
+    if (open) heading.current?.focus();
+  }, [open, step]);
 
   function chooseSlot(chosen: Slot) {
     setSlot(chosen);
@@ -163,7 +171,7 @@ export function BookingSheet({
     const { ok, data } = await postJson("/api/buyer/code", { phone });
     setBusy(false);
     if (ok) setDemoCode(data.demoCode);
-    else setError(data.error === "phone_invalid" ? t.phoneInvalid : t.bookingFailed);
+    else setError(requestError(t, data, t.actionFailed));
   }
 
   async function confirmDetails(event: FormEvent) {
@@ -180,17 +188,22 @@ export function BookingSheet({
       project,
     });
     setBusy(false);
-    if (!ok) {
-      if (data.error === "code_invalid") setError(t.codeInvalid);
-      else if (data.error === "phone_invalid") setError(t.phoneInvalid);
-      else setError(t.bookingFailed);
-      return;
-    }
+    if (!ok) return setError(requestError(t, data, t.actionFailed));
     setContactSaved(true);
     onContactSaved?.(data.executive ?? null);
     if (contactOnly || !slot) onClose();
     else await submitVisit(slot);
   }
+
+  const talkButton = onTalkToPerson ? (
+    <button type="button" onClick={onTalkToPerson} className={`mt-4 w-full ${secondaryButton}`}>
+      {t.talkToPerson}
+    </button>
+  ) : (
+    <Link href="/chat" className={`mt-4 block ${secondaryButton}`}>
+      {t.talkToPerson}
+    </Link>
+  );
 
   const title =
     step === "done" ? t.visitBooked : step === "details" ? t.yourDetails : step === "confirm" ? t.confirmBooking : t.pickVisitTime;
@@ -205,10 +218,10 @@ export function BookingSheet({
     >
       <div className="flex max-h-[85dvh] flex-col">
         <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4">
-          <h2 id="sheet-title" className="font-serif text-2xl">
+          <h2 id="sheet-title" ref={heading} tabIndex={-1} className="font-serif text-2xl outline-none">
             {title}
           </h2>
-          <button type="button" onClick={onClose} className="rounded px-2 py-2 text-sm text-muted underline underline-offset-4">
+          <button type="button" onClick={onClose} className="min-h-11 rounded px-2 text-sm text-muted underline underline-offset-4">
             {t.close}
           </button>
         </div>
@@ -244,15 +257,7 @@ export function BookingSheet({
               ) : slots.length === 0 ? (
                 <div>
                   <p>{t.noTimes}</p>
-                  {onTalkToPerson ? (
-                    <button type="button" onClick={onTalkToPerson} className={`mt-4 w-full ${secondaryButton}`}>
-                      {t.talkToPerson}
-                    </button>
-                  ) : (
-                    <Link href="/chat" className={`mt-4 block ${secondaryButton}`}>
-                      {t.talkToPerson}
-                    </Link>
-                  )}
+                  {talkButton}
                 </div>
               ) : (
                 <ul className="grid grid-cols-2 gap-2">
@@ -272,7 +277,14 @@ export function BookingSheet({
             </>
           )}
 
-          {step === "details" && (
+          {step === "details" && !showCodes && (
+            <div>
+              <p className="rounded-md bg-amber-soft px-3 py-2 text-sm text-amber">{t.codesUnavailable}</p>
+              {talkButton}
+            </div>
+          )}
+
+          {step === "details" && showCodes && (
             <form onSubmit={demoCode ? confirmDetails : sendCode} className="space-y-4" noValidate>
               {slot && <p className="tabular-nums">{slot.label}</p>}
               <label className="block text-sm font-medium">
@@ -314,6 +326,7 @@ export function BookingSheet({
                 <span>{t.consent}</span>
               </label>
 
+              {!demoCode && <p className="text-sm text-muted">{t.demoCodeNote}</p>}
               {demoCode && (
                 <>
                   <p className="rounded-md bg-neem-soft px-3 py-2 text-sm">
@@ -345,7 +358,7 @@ export function BookingSheet({
                     setCode("");
                     setError(null);
                   }}
-                  className="w-full py-1 text-sm text-muted underline underline-offset-4"
+                  className="min-h-11 w-full text-sm text-muted underline underline-offset-4"
                 >
                   {t.newCode}
                 </button>

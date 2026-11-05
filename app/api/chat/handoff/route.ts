@@ -4,6 +4,7 @@ import { languageEnum, leadSourceEnum } from "@/db/schema";
 import { handOff } from "@/lib/assistant";
 import { getBuyerState } from "@/lib/buyer";
 import { ensureConversation } from "@/lib/buyer-session";
+import { checkLimits, clientIp, LIMITS, readJson, tooMany } from "@/lib/limits";
 
 const body = z.object({
   language: z.enum(languageEnum.enumValues).default("en"),
@@ -13,8 +14,11 @@ const body = z.object({
 
 /** The "Talk to a person" button. It never touches the model, so it works when the AI is down. */
 export async function POST(request: Request) {
-  const parsed = body.safeParse(await request.json().catch(() => null));
+  const parsed = body.safeParse(await readJson(request));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+
+  const wait = await checkLimits(LIMITS.handoff(clientIp(request.headers)));
+  if (wait) return tooMany(wait);
 
   const conversation = await ensureConversation({
     language: parsed.data.language,

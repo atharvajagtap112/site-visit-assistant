@@ -1,17 +1,28 @@
 "use client";
 
-export default function ErrorPage({ reset }: { reset: () => void }) {
+import { usePathname } from "next/navigation";
+import { useSyncExternalStore } from "react";
+import { primaryButton } from "@/components/ui";
+import { LANGUAGES, STRINGS, type Language } from "@/lib/i18n";
+
+const STAFF_PATHS = /^\/(leads|dashboard|admin|sign-in)/;
+const noSubscribe = () => () => {};
+const cookieLanguage = (): Language => LANGUAGES.find((l) => l === /(?:^|; )lang=(\w+)/.exec(document.cookie)?.[1]) ?? "en";
+
+export default function ErrorPage({ retry }: { retry: () => void }) {
+  const isStaff = STAFF_PATHS.test(usePathname());
+  const buyerLanguage = useSyncExternalStore(noSubscribe, cookieLanguage, (): Language => "en");
+  const language = isStaff ? "en" : buyerLanguage;
+  const t = STRINGS[language];
+
   return (
-    <main className="mx-auto max-w-md px-6 py-24">
-      <h1 className="font-serif text-3xl">This page could not load</h1>
-      <p className="mt-3 text-muted">
-        The server did not respond as expected. Your data has not changed.
+    <main lang={language} className="mx-auto max-w-md px-6 py-24">
+      <h1 className="font-serif text-3xl">{t.errorTitle}</h1>
+      <p role="alert" className="mt-3 text-muted">
+        {t.errorHelp}
       </p>
-      <button
-        onClick={reset}
-        className="mt-6 rounded-md bg-neem px-5 py-3 font-medium text-white hover:bg-neem-dark"
-      >
-        Try again
+      <button type="button" onClick={() => retry()} className={`mt-6 ${primaryButton}`}>
+        {t.retry}
       </button>
     </main>
   );

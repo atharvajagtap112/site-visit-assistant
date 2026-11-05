@@ -5,12 +5,14 @@ import { ChatScreen } from "@/components/chat-screen";
 import { db } from "@/db";
 import { leadSourceEnum, projects, users } from "@/db/schema";
 import { listMessages } from "@/lib/assistant";
-import { getBuyerState } from "@/lib/buyer";
+import { getBuyerState, showCodes } from "@/lib/buyer";
 import { getConversation } from "@/lib/buyer-session";
 import { STRINGS } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
 
-export const metadata: Metadata = { title: "Ask or book a visit | Company A Homes", robots: "noindex" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: `${STRINGS[await getLanguage()].askOrBook} | Company A Homes`, robots: "noindex" };
+}
 
 const sourceParam = z.enum(leadSourceEnum.enumValues).catch("website");
 
@@ -31,7 +33,7 @@ export default async function ChatPage({
   const project =
     rows.find((p) => p.slug === params.project) ?? rows.find((p) => p.id === state?.projectId) ?? rows[0];
 
-  if (!project) return <p className="p-8 text-muted">{STRINGS[language].noProjects}</p>;
+  if (!project) return <main lang={language} className="p-8 text-muted">{STRINGS[language].noProjects}</main>;
 
   return (
     <ChatScreen
@@ -41,6 +43,7 @@ export default async function ChatPage({
       history={history}
       handedOffTo={conversation?.handedOffAt ? { executive: state?.executive ?? null } : null}
       initialHasContact={state?.hasContact ?? false}
+      showCodes={showCodes()}
       initialHasVisit={Boolean(state?.visit && state.visit.startsAt > new Date())}
     />
   );

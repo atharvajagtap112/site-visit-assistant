@@ -5,13 +5,15 @@ import { MapLink } from "@/components/map-link";
 import { PhoneSignIn } from "@/components/phone-sign-in";
 import { primaryButton } from "@/components/ui";
 import { BookAgain, OptOut, VisitActions } from "@/components/visit-actions";
-import { getBuyerState } from "@/lib/buyer";
+import { getBuyerState, showCodes } from "@/lib/buyer";
 import { getConversation } from "@/lib/buyer-session";
 import { formatVisitTime } from "@/lib/format";
 import { STRINGS } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
 
-export const metadata: Metadata = { title: "My visit | Company A Homes", robots: "noindex" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: `${STRINGS[await getLanguage()].visitTitle} | Company A Homes`, robots: "noindex" };
+}
 
 export default async function VisitPage({ searchParams }: { searchParams: Promise<{ done?: string }> }) {
   const language = await getLanguage();
@@ -28,7 +30,7 @@ export default async function VisitPage({ searchParams }: { searchParams: Promis
   return (
     <div lang={language} className="mx-auto min-h-dvh max-w-2xl px-5 py-5 sm:px-8">
       <header className="flex items-center justify-between gap-4">
-        <Link href="/" className="font-serif text-lg whitespace-nowrap sm:text-xl">
+        <Link href="/" className="inline-flex min-h-11 items-center font-serif text-lg whitespace-nowrap sm:text-xl">
           Company A Homes
         </Link>
         <LanguagePicker current={language} />
@@ -45,7 +47,7 @@ export default async function VisitPage({ searchParams }: { searchParams: Promis
 
         {visit ? (
           <>
-            <p className="mt-8 font-serif text-3xl tabular-nums">{formatVisitTime(visit.startsAt)}</p>
+            <p className="mt-8 font-serif text-3xl tabular-nums">{formatVisitTime(visit.startsAt, language)}</p>
             <p className="mt-3 text-lg">{visit.project}</p>
             <p className="mt-1">{visit.locationLabel}</p>
             <div className="mt-1">
@@ -64,7 +66,7 @@ export default async function VisitPage({ searchParams }: { searchParams: Promis
               <>
                 <p className="mt-8 rounded-md bg-amber-soft px-3 py-2 text-amber">{t.visitPastNote}</p>
                 <div className="mt-5">
-                  <BookAgain language={language} project={visit.slug} />
+                  <BookAgain language={language} project={visit.slug} showCodes={showCodes()} />
                 </div>
               </>
             ) : (
@@ -81,7 +83,7 @@ export default async function VisitPage({ searchParams }: { searchParams: Promis
                   )}
                 </section>
                 <div className="mt-8">
-                  <VisitActions language={language} project={visit.slug} />
+                  <VisitActions language={language} project={visit.slug} showCodes={showCodes()} />
                 </div>
               </>
             )}
@@ -92,7 +94,7 @@ export default async function VisitPage({ searchParams }: { searchParams: Promis
             <Link href="/chat" className={`mt-5 inline-block ${primaryButton}`}>
               {t.bookVisit}
             </Link>
-            {!state?.hasContact && <PhoneSignIn language={language} />}
+            {!state?.hasContact && <PhoneSignIn language={language} showCodes={showCodes()} />}
           </>
         )}
 

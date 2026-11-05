@@ -17,7 +17,7 @@ export function AdminTabs({ toReview }: { toReview: number }) {
           key={tab.href}
           href={tab.href}
           aria-current={pathname === tab.href ? "page" : undefined}
-          className={`py-2 underline-offset-4 hover:underline ${pathname === tab.href ? "font-medium underline" : "text-muted"}`}
+          className={`inline-flex min-h-11 items-center underline-offset-4 hover:underline ${pathname === tab.href ? "font-medium underline" : "text-muted"}`}
         >
           {tab.label}
         </Link>

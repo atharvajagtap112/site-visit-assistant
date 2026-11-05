@@ -3,6 +3,7 @@ import { z } from "zod";
 import { cancelVisit, optOut, rescheduleVisit } from "@/lib/booking";
 import { getBuyerState } from "@/lib/buyer";
 import { getConversation } from "@/lib/buyer-session";
+import { readJson } from "@/lib/limits";
 
 const body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("cancel") }),
@@ -12,7 +13,7 @@ const body = z.discriminatedUnion("action", [
 
 /** The visit comes from the cookie's own lead, so a buyer can only ever change their own. */
 export async function POST(request: Request) {
-  const parsed = body.safeParse(await request.json().catch(() => null));
+  const parsed = body.safeParse(await readJson(request));
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
 
   const conversation = await getConversation();

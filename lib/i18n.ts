@@ -42,7 +42,7 @@ const en = {
   consent: "I agree that Company A may contact me about this enquiry by phone, SMS or WhatsApp. I can opt out at any time.",
   consentRequired: "Tick the box so we can contact you about your visit.",
   sendCode: "Send code",
-  enterCode: "Enter the code sent to your phone",
+  enterCode: "Enter the code",
   demoCode: "Messages are simulated in this demo. Your code is",
   codeInvalid: "That code is wrong or has expired. Check it or ask for a new one.",
   newCode: "Change number or get a new code",
@@ -79,6 +79,19 @@ const en = {
   noLeadForPhone: "We have no enquiry for this number.",
   visitPastNote: "This visit's time has passed. Our team will update it shortly.",
   bookAgain: "Book another visit",
+  languageLabel: "Language",
+  lakh: "lakh",
+  crore: "crore",
+  homeMetaTitle: "Homes in Ahmedabad | Company A Homes",
+  errorTitle: "This page could not load",
+  errorHelp: "The server did not respond as expected. Nothing you entered was changed. Try again in a moment.",
+  notFoundTitle: "Page not found",
+  notFoundHelp: "There is nothing at this address that you can open. Check the link, or start again from here.",
+  goHome: "Go to the home page",
+  actionFailed: "That did not work. Check your connection and try again.",
+  tooManyTries: "Too many tries. Wait about {n} min, then try again.",
+  codesUnavailable: "We cannot send text messages right now, so we cannot confirm your number here. Please try again later, or talk to a person.",
+  demoCodeNote: "In this demo no text message is sent. Your code appears on this screen.",
 };
 
 export type Strings = typeof en;
@@ -122,7 +135,7 @@ const hi: Strings = {
   consent: "मैं सहमत हूं कि Company A इस पूछताछ के बारे में मुझसे फोन, SMS या WhatsApp पर संपर्क कर सकती है। मैं कभी भी इसे बंद कर सकता/सकती हूं।",
   consentRequired: "बॉक्स चुनें ताकि हम आपकी विज़िट के बारे में आपसे संपर्क कर सकें।",
   sendCode: "कोड भेजें",
-  enterCode: "आपके फोन पर भेजा गया कोड दर्ज करें",
+  enterCode: "कोड दर्ज करें",
   demoCode: "इस डेमो में संदेश सिम्युलेट किए गए हैं। आपका कोड है",
   codeInvalid: "यह कोड गलत है या समाप्त हो गया है। जांचें या नया कोड लें।",
   newCode: "नंबर बदलें या नया कोड लें",
@@ -159,6 +172,19 @@ const hi: Strings = {
   noLeadForPhone: "इस नंबर से कोई पूछताछ नहीं मिली।",
   visitPastNote: "इस विज़िट का समय बीत चुका है। हमारी टीम जल्द ही इसे अपडेट करेगी।",
   bookAgain: "दूसरी विज़िट बुक करें",
+  languageLabel: "भाषा",
+  lakh: "लाख",
+  crore: "करोड़",
+  homeMetaTitle: "अहमदाबाद में घर | Company A Homes",
+  errorTitle: "यह पेज लोड नहीं हो सका",
+  errorHelp: "सर्वर से सही जवाब नहीं मिला। आपकी दी हुई कोई जानकारी नहीं बदली है। थोड़ी देर में फिर कोशिश करें।",
+  notFoundTitle: "पेज नहीं मिला",
+  notFoundHelp: "इस पते पर ऐसा कुछ नहीं है जिसे आप खोल सकें। लिंक जांचें या यहां से फिर शुरू करें।",
+  goHome: "होम पेज पर जाएं",
+  actionFailed: "यह नहीं हो सका। अपना कनेक्शन जांचें और फिर कोशिश करें।",
+  tooManyTries: "बहुत ज़्यादा कोशिशें हो गईं। लगभग {n} मिनट रुकें, फिर कोशिश करें।",
+  codesUnavailable: "हम अभी SMS नहीं भेज पा रहे, इसलिए यहां आपका नंबर पक्का नहीं हो सकता। कृपया बाद में कोशिश करें या किसी व्यक्ति से बात करें।",
+  demoCodeNote: "इस डेमो में कोई SMS नहीं भेजा जाता। आपका कोड इसी स्क्रीन पर दिखेगा।",
 };
 
 const gu: Strings = {
@@ -200,7 +226,7 @@ const gu: Strings = {
   consent: "હું સંમત છું કે Company A આ પૂછપરછ વિશે મારો ફોન, SMS અથવા WhatsApp પર સંપર્ક કરી શકે છે. હું ગમે ત્યારે તે બંધ કરી શકું છું.",
   consentRequired: "બોક્સ પસંદ કરો જેથી અમે તમારી મુલાકાત વિશે તમારો સંપર્ક કરી શકીએ.",
   sendCode: "કોડ મોકલો",
-  enterCode: "તમારા ફોન પર મોકલેલો કોડ દાખલ કરો",
+  enterCode: "કોડ દાખલ કરો",
   demoCode: "આ ડેમોમાં સંદેશ સિમ્યુલેટ કરેલા છે. તમારો કોડ છે",
   codeInvalid: "આ કોડ ખોટો છે અથવા સમાપ્ત થઈ ગયો છે. તપાસો અથવા નવો કોડ મેળવો.",
   newCode: "નંબર બદલો અથવા નવો કોડ મેળવો",
@@ -237,6 +263,37 @@ const gu: Strings = {
   noLeadForPhone: "આ નંબરની કોઈ પૂછપરછ મળી નથી.",
   visitPastNote: "આ મુલાકાતનો સમય વીતી ગયો છે. અમારી ટીમ ટૂંક સમયમાં તેને અપડેટ કરશે.",
   bookAgain: "બીજી મુલાકાત બુક કરો",
+  languageLabel: "ભાષા",
+  lakh: "લાખ",
+  crore: "કરોડ",
+  homeMetaTitle: "અમદાવાદમાં ઘર | Company A Homes",
+  errorTitle: "આ પેજ લોડ થઈ શક્યું નથી",
+  errorHelp: "સર્વર તરફથી યોગ્ય જવાબ મળ્યો નથી. તમે આપેલી કોઈ માહિતી બદલાઈ નથી. થોડી વારમાં ફરી પ્રયાસ કરો.",
+  notFoundTitle: "પેજ મળ્યું નથી",
+  notFoundHelp: "આ સરનામે એવું કંઈ નથી જે તમે ખોલી શકો. લિંક તપાસો અથવા અહીંથી ફરી શરૂ કરો.",
+  goHome: "હોમ પેજ પર જાઓ",
+  actionFailed: "આ થઈ શક્યું નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
+  tooManyTries: "ઘણા બધા પ્રયાસ થઈ ગયા. લગભગ {n} મિનિટ રાહ જુઓ, પછી ફરી પ્રયાસ કરો.",
+  codesUnavailable: "અમે અત્યારે SMS મોકલી શકતા નથી, તેથી અહીં તમારો નંબર ચકાસી શકાતો નથી. કૃપા કરીને પછી પ્રયાસ કરો અથવા કોઈ વ્યક્તિ સાથે વાત કરો.",
+  demoCodeNote: "આ ડેમોમાં કોઈ SMS મોકલાતો નથી. તમારો કોડ આ જ સ્ક્રીન પર દેખાશે.",
 };
 
 export const STRINGS: Record<Language, Strings> = { en, hi, gu };
+
+/** The buyer's wording for an error code from the API, or the fallback for anything else. */
+export function requestError(t: Strings, data: { error?: unknown; wait?: unknown }, fallback: string) {
+  switch (data.error) {
+    case "rate_limited":
+      return t.tooManyTries.replace("{n}", String(Math.ceil(Number(data.wait) / 60) || 1));
+    case "codes_unavailable":
+      return t.codesUnavailable;
+    case "phone_invalid":
+      return t.phoneInvalid;
+    case "code_invalid":
+      return t.codeInvalid;
+    case "no_lead":
+      return t.noLeadForPhone;
+    default:
+      return fallback;
+  }
+}

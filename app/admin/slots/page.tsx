@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Slots | Company A Homes", robots: "n
 
 const TIME = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true });
 const DAY_TITLE = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
-const compactButton = "rounded-md border border-line bg-white px-4 py-2 text-sm font-medium hover:border-neem disabled:opacity-60";
+const compactButton = "min-h-11 rounded-md border border-line bg-white px-4 text-sm font-medium hover:border-neem disabled:opacity-60";
 
 const VISIT_WORDS = { booked: "Booked by", visited: "Visited,", no_show: "No-show," } as const;
 

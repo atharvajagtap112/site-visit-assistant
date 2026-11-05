@@ -8,6 +8,7 @@ import {
   Noto_Serif_Gujarati,
 } from "next/font/google";
 import type { ReactNode } from "react";
+import { getLanguage } from "@/lib/language";
 import "./globals.css";
 
 const newsreader = Newsreader({ subsets: ["latin"], variable: "--font-newsreader" });
@@ -23,9 +24,10 @@ export const metadata: Metadata = {
   description: "Ask about our homes in Ahmedabad and book a site visit.",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+/** The buyer's language for the whole page. Staff screens are English, and say so on their own wrapper. */
+export default async function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${newsreader.variable} ${hanken.variable} ${hindiSans.variable} ${hindiSerif.variable} ${gujaratiSans.variable} ${gujaratiSerif.variable}`}>
+    <html lang={await getLanguage()} className={`${newsreader.variable} ${hanken.variable} ${hindiSans.variable} ${hindiSerif.variable} ${gujaratiSans.variable} ${gujaratiSerif.variable}`}>
       <body>{children}</body>
     </html>
   );

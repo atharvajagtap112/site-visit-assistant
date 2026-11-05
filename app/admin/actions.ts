@@ -15,6 +15,7 @@ import {
   updateFact,
   updateProject,
 } from "@/lib/admin";
+import { withoutNul } from "@/lib/format";
 import { requireHead } from "@/lib/session";
 
 const id = z.coerce.number().int().positive().max(2_147_483_647);
@@ -31,7 +32,9 @@ export type FormState = {
 /** Only text goes back to the browser, whatever a crafted request sent. React's own $ACTION fields stay out. */
 function textValues(form: FormData) {
   return Object.fromEntries(
-    [...form].filter((entry): entry is [string, string] => typeof entry[1] === "string" && !entry[0].startsWith("$")),
+    [...form]
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string" && !entry[0].startsWith("$"))
+      .map(([key, value]) => [key, withoutNul(value)]),
   );
 }
 

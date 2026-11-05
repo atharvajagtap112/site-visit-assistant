@@ -178,3 +178,10 @@ export const messages = pgTable("messages", {
   sendAt: timestamp("send_at", { withTimezone: true }).notNull(),
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
 });
+
+// Counters behind lib/limits.ts. The key is a hash, so no phone, email or IP address is kept here.
+export const rateLimits = pgTable("rate_limits", {
+  key: text().primaryKey(),
+  count: integer().notNull(),
+  windowEndsAt: timestamp("window_ends_at", { withTimezone: true }).notNull(),
+});

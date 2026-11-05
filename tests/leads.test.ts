@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../db";
-import { chatMessages, conversations, leads, visits } from "../db/schema";
+import { chatMessages, conversations, leads, messages, visits } from "../db/schema";
 import { listMessages } from "../lib/assistant";
 import { bookVisit } from "../lib/booking";
 import {
@@ -18,6 +18,7 @@ import {
   parseLeadFilters,
   reassignLead,
   recordConsent,
+  recordOptOut,
   recordShowUpForLead,
   rescheduleForLead,
   setLeadClosed,
@@ -542,5 +543,57 @@ describe("withheld replies", () => {
     expect(staffView?.chats[0].lines[0].blockedDraft).toBe("I can give you 10% off.");
     expect(staffView?.chats[0].flagReason).toBe("discount");
     expect(JSON.stringify(await listMessages(conversation.id))).not.toContain("10% off");
+  });
+});
+
+describe("recording an opt-out from staff", () => {
+  const PHONE = "+919876500001";
+
+  it("lets the assigned executive and the sales head record it, and nobody else", async () => {
+    const { riya, jay, head } = await team();
+    const mine = await makeLead({ assignedToId: riya.id });
+    const headsPick = await makeLead({ assignedToId: riya.id });
+
+    expect(await recordOptOut(jay, mine.id)).toEqual({ ok: false, reason: "lead_not_found" });
+    expect((await leadRow(mine.id)).optedOutAt).toBeNull();
+
+    expect(await recordOptOut(riya, mine.id)).toEqual({ ok: true });
+    expect((await leadRow(mine.id)).optedOutAt).not.toBeNull();
+    expect(await recordOptOut(head, headsPick.id)).toEqual({ ok: true });
+  });
+
+  it("covers every enquiry from the phone and cancels pending messages", async () => {
+    const { riya, jay } = await team();
+    const project = await makeProject();
+    const slot = await makeSlot(project.id);
+    const lead = await makeLead({ assignedToId: riya.id, phone: PHONE });
+    const other = await makeLead({ assignedToId: jay.id, phone: PHONE });
+    await bookForLead(riya, lead.id, slot.id);
+
+    await recordOptOut(riya, lead.id);
+
+    expect((await leadRow(other.id)).optedOutAt).not.toBeNull();
+    const pending = await db.select().from(messages).where(eq(messages.leadId, lead.id));
+    expect(pending.filter((m) => m.sendAt > new Date() && !m.cancelledAt)).toEqual([]);
+  });
+
+  it("keeps the first opt-out time when recorded twice", async () => {
+    const { riya } = await team();
+    const lead = await makeLead({ assignedToId: riya.id });
+    await recordOptOut(riya, lead.id);
+    const first = (await leadRow(lead.id)).optedOutAt;
+    await recordOptOut(riya, lead.id);
+    expect((await leadRow(lead.id)).optedOutAt).toEqual(first);
+  });
+
+  it("stops booking, and recording consent does not lift it", async () => {
+    const { riya } = await team();
+    const project = await makeProject();
+    const slot = await makeSlot(project.id);
+    const lead = await makeLead({ assignedToId: riya.id, phone: PHONE });
+    await recordOptOut(riya, lead.id);
+
+    expect(await bookForLead(riya, lead.id, slot.id)).toEqual({ ok: false, reason: "opted_out" });
+    expect(await recordConsent(riya, lead.id)).toEqual({ ok: false, reason: "opted_out" });
   });
 });

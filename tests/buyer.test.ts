@@ -46,20 +46,20 @@ describe("phone numbers", () => {
 
 describe("one-time codes", () => {
   it("accepts the right code once", async () => {
-    const code = await startCode(PHONE);
+    const code = (await startCode(PHONE))!;
 
     expect(await verifyCode(PHONE, code)).toBe(true);
     expect(await verifyCode(PHONE, code)).toBe(false);
   });
 
   it("does not store the code itself", async () => {
-    const code = await startCode(PHONE);
+    const code = (await startCode(PHONE))!;
     const [row] = await db.select().from(otpCodes);
     expect(row.codeHash).not.toContain(code);
   });
 
   it("rejects a wrong code, another phone's code and an expired code", async () => {
-    const code = await startCode(PHONE);
+    const code = (await startCode(PHONE))!;
     expect(await verifyCode(PHONE, code === "111111" ? "222222" : "111111")).toBe(false);
     expect(await verifyCode("+919876543211", code)).toBe(false);
 
@@ -68,7 +68,7 @@ describe("one-time codes", () => {
   });
 
   it("locks after 5 wrong tries, even for the right code", async () => {
-    const code = await startCode(PHONE);
+    const code = (await startCode(PHONE))!;
     const wrong = code === "111111" ? "222222" : "111111";
     for (let i = 0; i < 5; i++) await verifyCode(PHONE, wrong);
 
@@ -76,7 +76,7 @@ describe("one-time codes", () => {
   });
 
   it("cannot be beaten by parallel guesses", async () => {
-    const code = await startCode(PHONE);
+    const code = (await startCode(PHONE))!;
     const wrong = code === "111111" ? "222222" : "111111";
 
     await Promise.all(Array.from({ length: 20 }, () => verifyCode(PHONE, wrong)));

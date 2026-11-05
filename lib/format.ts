@@ -1,3 +1,4 @@
+import type { Language } from "./i18n";
 import type { languageEnum, leadSourceEnum, leadStatusEnum, messageKindEnum, visitStatusEnum } from "../db/schema";
 
 type LeadSource = (typeof leadSourceEnum.enumValues)[number];
@@ -50,17 +51,22 @@ export function messageState(message: { sendAt: Date; cancelledAt: Date | null }
   return message.sendAt <= now ? "Sent" : "Pending";
 }
 
-const visitTime = new Intl.DateTimeFormat("en-IN", {
-  timeZone: "Asia/Kolkata",
-  day: "numeric",
-  month: "short",
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
-});
+const visitTime = (locale: string) =>
+  new Intl.DateTimeFormat(locale, {
+    timeZone: "Asia/Kolkata",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+const VISIT_TIMES: Record<Language, Intl.DateTimeFormat> = { en: visitTime("en-IN"), hi: visitTime("hi-IN"), gu: visitTime("gu-IN") };
 
-/** Always India time, wherever the server runs. */
-export const formatVisitTime = (date: Date) => visitTime.format(date);
+/** Always India time, wherever the server runs. Staff screens and the model always get English. */
+export const formatVisitTime = (date: Date, language: Language = "en") => VISIT_TIMES[language].format(date);
+
+/** Postgres cannot store a NUL character, and only a forged request sends one. */
+export const withoutNul = (text: string) => text.replaceAll("\0", "");
 
 /** YYYY-MM-DD in India, wherever the server runs. */
 export const indiaDate = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });

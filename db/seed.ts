@@ -35,7 +35,7 @@ function istTime(dayOffset: number, hour: number) {
 }
 
 await db.execute(
-  sql`TRUNCATE otp_codes, messages, visits, slots, leads, projects, sessions, users RESTART IDENTITY CASCADE`,
+  sql`TRUNCATE rate_limits, otp_codes, messages, visits, slots, leads, projects, sessions, users RESTART IDENTITY CASCADE`,
 );
 
 const passwordHash = await hashPassword(DEMO_PASSWORD);

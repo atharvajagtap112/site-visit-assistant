@@ -15,9 +15,9 @@ import {
 } from "../db/schema";
 import { assignExecutive } from "./assistant";
 import type { SessionUser } from "./auth";
-import { bookVisit, cancelVisit, correctShowUp, recordShowUp, rescheduleVisit, type BookingResult, type ShowUp } from "./booking";
+import { bookVisit, cancelVisit, correctShowUp, optOut, recordShowUp, rescheduleVisit, type BookingResult, type ShowUp } from "./booking";
 import { normalisePhone } from "./buyer";
-import { LANGUAGE_LABELS } from "./format";
+import { LANGUAGE_LABELS, withoutNul } from "./format";
 
 const MAX_ID = 2_147_483_647;
 const id = z.coerce.number().int().positive().max(MAX_ID);
@@ -36,7 +36,7 @@ export const VISIT_STATES = {
 
 // `catch` drops anything invalid, so a hand-edited URL shows the wider list instead of an error.
 const filterSchema = z.object({
-  q: z.string().trim().max(100).transform((q) => q || undefined).optional().catch(undefined),
+  q: z.string().trim().max(100).transform((q) => withoutNul(q) || undefined).optional().catch(undefined),
   source: z.enum(leadSourceEnum.enumValues).optional().catch(undefined),
   status: z.enum(leadStatusEnum.enumValues).optional().catch(undefined),
   visit: z.enum(Object.keys(VISIT_STATES) as [keyof typeof VISIT_STATES]).optional().catch(undefined),
@@ -453,6 +453,14 @@ export async function reassignLead(user: SessionUser, leadId: number, executiveI
     .update(leads)
     .set({ assignedToId: executive.id })
     .where(lead.phone ? eq(leads.phone, lead.phone) : eq(leads.id, leadId));
+  return done;
+}
+
+/** A buyer can opt out by phone too, and DPDP says that counts. Only the buyer's own consent lifts it. */
+export async function recordOptOut(user: SessionUser, leadId: number): Promise<Outcome> {
+  const lead = await findLead(user, leadId);
+  if (!lead) return failed("lead_not_found");
+  if (!lead.optedOutAt) await optOut(leadId);
   return done;
 }
 

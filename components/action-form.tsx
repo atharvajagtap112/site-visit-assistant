@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { secondaryButton } from "./ui";
 
 export type ActionState = { error?: string } | null;
@@ -28,6 +29,14 @@ export function ActionForm({
 }) {
   const [state, run, pending] = useActionState(action, null);
   const [asking, setAsking] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const no = useRef<HTMLButtonElement>(null);
+
+  // The pressed button leaves the page, so focus goes to the safe answer, and back again after it.
+  function ask(value: boolean) {
+    flushSync(() => setAsking(value));
+    (value ? no : trigger).current?.focus();
+  }
 
   return (
     <form action={run}>
@@ -36,7 +45,7 @@ export function ActionForm({
       ))}
       {children}
       {confirm && !asking ? (
-        <button type="button" onClick={() => setAsking(true)} className={`w-full ${buttonClass}`}>
+        <button ref={trigger} type="button" onClick={() => ask(true)} className={`w-full ${buttonClass}`}>
           {label}
         </button>
       ) : confirm ? (
@@ -46,7 +55,7 @@ export function ActionForm({
             <button disabled={pending} className={buttonClass}>
               {pending ? pendingLabel : confirm.yes}
             </button>
-            <button type="button" onClick={() => setAsking(false)} className={secondaryButton}>
+            <button ref={no} type="button" onClick={() => ask(false)} className={secondaryButton}>
               {confirm.no}
             </button>
           </div>

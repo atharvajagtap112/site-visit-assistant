@@ -1,5 +1,5 @@
 import type { Content, Part } from "@google/genai";
-import { and, asc, count, desc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
 import {
@@ -45,12 +45,15 @@ export async function startConversation(
   token: string,
   lead: Pick<typeof leads.$inferInsert, "source" | "language" | "projectId">,
 ) {
+  const tokenHash = hashToken(token);
   return db.transaction(async (tx) => {
+    // Parallel first requests carry the same token, and only one of them may create the lead.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tokenHash}))`);
+    const [found] = await tx.select().from(conversations).where(eq(conversations.tokenHash, tokenHash));
+    if (found) return found;
+
     const [row] = await tx.insert(leads).values(lead).returning({ id: leads.id });
-    const [conversation] = await tx
-      .insert(conversations)
-      .values({ tokenHash: hashToken(token), leadId: row.id })
-      .returning();
+    const [conversation] = await tx.insert(conversations).values({ tokenHash, leadId: row.id }).returning();
     return conversation;
   });
 }
@@ -145,6 +148,7 @@ async function runTool(
   conversationId: number,
   leadId: number,
   cards: ChatCard[],
+  language: Language,
 ): Promise<Record<string, unknown>> {
   switch (name) {
     case "get_free_slots": {
@@ -154,13 +158,14 @@ async function runTool(
       await db.update(leads).set({ projectId: project.id }).where(eq(leads.id, leadId));
       const free = await getFreeSlots(project.id, 300);
       const onDate = args.date ? free.filter((s) => indiaDate(s.startsAt) === args.date) : free;
-      const offered = onDate.slice(0, SLOTS_OFFERED).map((s) => ({
-        id: s.id,
-        label: formatVisitTime(s.startsAt),
-        year: indiaYear(s.startsAt),
-      }));
-      if (offered.length) cards.push({ type: "slots", slots: offered.map(({ id, label }) => ({ id, label })) });
-      return { free_slots: offered.map((s) => ({ slot_id: s.id, time: s.label, year: s.year })) };
+      const offered = onDate.slice(0, SLOTS_OFFERED);
+      // The buyer's card reads in their language. What the model sees stays in English.
+      if (offered.length) {
+        cards.push({ type: "slots", slots: offered.map((s) => ({ id: s.id, label: formatVisitTime(s.startsAt, language) })) });
+      }
+      return {
+        free_slots: offered.map((s) => ({ slot_id: s.id, time: formatVisitTime(s.startsAt), year: indiaYear(s.startsAt) })),
+      };
     }
 
     case "book_visit": {
@@ -178,7 +183,7 @@ async function runTool(
         cards.push({
           type: "booked",
           visitId: result.visitId,
-          label,
+          label: formatVisitTime(row.startsAt, language),
           project: row.project.name,
           reraNumber: row.project.reraNumber,
           mapUrl: row.project.mapUrl,
@@ -187,7 +192,7 @@ async function runTool(
       }
       // A chat buyer has not given a name, number or consent yet. The form collects them.
       if (result.reason === "no_consent") {
-        cards.push({ type: "contact_needed", slotId, label });
+        cards.push({ type: "contact_needed", slotId, label: formatVisitTime(row.startsAt, language) });
         return { result: "details_needed", time: label, year: indiaYear(row.startsAt) };
       }
       return { result: result.reason };
@@ -306,7 +311,7 @@ export async function respond(
       for (const call of response.functionCalls) {
         let output: Record<string, unknown>;
         try {
-          output = await runTool(call.name, call.args, conversationId, lead.id, cards);
+          output = await runTool(call.name, call.args, conversationId, lead.id, cards, language);
         } catch (error) {
           if (!(error instanceof z.ZodError)) throw error;
           output = { error: "invalid arguments" };

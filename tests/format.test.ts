@@ -11,6 +11,15 @@ describe("format", () => {
     expect(formatVisitTime(new Date("2026-11-08T20:00:00Z")).replace(/\s/g, " ")).toBe("9 Nov, 1:30 am");
   });
 
+  it("writes the buyer's dates in their language and leaves English unchanged", () => {
+    expect(formatVisitTime(AT, "en")).toBe(WHEN);
+    expect(formatVisitTime(AT, "hi")).toMatch(/[ऀ-ॿ]/);
+    expect(formatVisitTime(AT, "gu")).toMatch(/[઀-૿]/);
+    // Still India time, in digits a buyer can read.
+    expect(formatVisitTime(AT, "hi")).toContain("11:00");
+    expect(formatVisitTime(AT, "gu")).toContain("11:00");
+  });
+
   it.each([
     ["no visit", null, "Not booked", false],
     ["cancelled", { status: "cancelled", startsAt: AT }, "Not booked", false],

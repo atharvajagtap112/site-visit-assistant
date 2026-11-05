@@ -39,7 +39,7 @@ export default async function FlaggedPage({
             key={key}
             href={href(key)}
             aria-current={key === filter ? "page" : undefined}
-            className={`py-2 underline-offset-4 hover:underline ${key === filter ? "font-medium underline" : "text-muted"}`}
+            className={`inline-flex min-h-11 items-center underline-offset-4 hover:underline ${key === filter ? "font-medium underline" : "text-muted"}`}
           >
             {FLAG_FILTERS[key]}
           </Link>
@@ -57,7 +57,7 @@ export default async function FlaggedPage({
             {rows.map((chat) => (
               <li key={chat.id} className="py-6">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-                  <Link href={`/leads/${chat.leadId}`} className="py-1 font-medium underline underline-offset-4">
+                  <Link href={`/leads/${chat.leadId}`} className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
                     LD-{chat.leadId}, {chat.leadName ?? "name not given"}
                   </Link>
                   {chat.flaggedAt && <span className="text-sm text-muted tabular-nums">{formatVisitTime(chat.flaggedAt)}</span>}

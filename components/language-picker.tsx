@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { LANGUAGE_NAMES, LANGUAGES, type Language } from "@/lib/i18n";
+import { LANGUAGE_NAMES, LANGUAGES, STRINGS, type Language } from "@/lib/i18n";
 
 /** Saved in a readable cookie, because the server needs it to pick the page's language. */
 export function LanguagePicker({ current }: { current: Language }) {
@@ -13,7 +13,7 @@ export function LanguagePicker({ current }: { current: Language }) {
   }
 
   return (
-    <div role="group" aria-label="Language" className="flex gap-1 text-sm">
+    <div role="group" aria-label={STRINGS[current].languageLabel} className="flex gap-1 text-sm">
       {LANGUAGES.map((language) => (
         <button
           key={language}
@@ -21,7 +21,7 @@ export function LanguagePicker({ current }: { current: Language }) {
           lang={language}
           aria-pressed={language === current}
           onClick={() => choose(language)}
-          className={`rounded px-2.5 py-2 ${language === current ? "bg-neem-soft font-medium text-neem" : "text-muted hover:text-ink"}`}
+          className={`min-h-11 rounded px-2.5 ${language === current ? "bg-neem-soft font-medium text-neem" : "text-muted hover:text-ink"}`}
         >
           {LANGUAGE_NAMES[language]}
         </button>

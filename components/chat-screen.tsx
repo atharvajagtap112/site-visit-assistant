@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ChatCard } from "@/lib/assistant";
-import { STRINGS, type Language } from "@/lib/i18n";
+import { requestError, STRINGS, type Language } from "@/lib/i18n";
 import { BookingSheet, type Booked, type Slot } from "./booking-sheet";
 import { LanguagePicker } from "./language-picker";
 import { MapLink } from "./map-link";
@@ -12,6 +12,9 @@ import { postJson, primaryButton, secondaryButton, textInput } from "./ui";
 type Item =
   | { kind: "message"; id: string; role: "buyer" | "assistant"; text: string }
   | { kind: "card"; id: string; card: ChatCard };
+
+const headerAction = "flex min-h-11 items-center justify-center rounded-md border border-line bg-white px-2 text-center font-medium hover:border-neem";
+const suggestion = "min-h-11 rounded-full border border-line bg-white px-4 text-sm hover:border-neem";
 
 let nextId = 0;
 const newId = () => `local-${nextId++}`;
@@ -24,6 +27,7 @@ export function ChatScreen({
   handedOffTo,
   initialHasContact,
   initialHasVisit,
+  showCodes,
 }: {
   language: Language;
   source: string;
@@ -32,6 +36,7 @@ export function ChatScreen({
   handedOffTo: { executive: string | null } | null;
   initialHasContact: boolean;
   initialHasVisit: boolean;
+  showCodes: boolean;
 }) {
   const t = STRINGS[language];
   const [items, setItems] = useState<Item[]>(() => [
@@ -40,7 +45,7 @@ export function ChatScreen({
   ]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [failed, setFailed] = useState<string | null>(null);
+  const [failed, setFailed] = useState<{ message: string; text: string } | null>(null);
   const [hasContact, setHasContact] = useState(initialHasContact);
   const [hasVisit, setHasVisit] = useState(initialHasVisit);
   const [sheet, setSheet] = useState<{ slot?: Slot | null; contactOnly?: boolean } | null>(null);
@@ -62,7 +67,7 @@ export function ChatScreen({
     const { ok, data } = await postJson("/api/chat", { message, language, source, project: project.slug });
     setSending(false);
     if (!ok) {
-      setFailed(message);
+      setFailed({ message, text: requestError(t, data, t.notSent) });
       return;
     }
     setItems((current) => [...current, { kind: "message", id: newId(), role: "assistant", text: data.reply }]);
@@ -84,13 +89,13 @@ export function ChatScreen({
     void send(message);
   }
 
-  const [personFailed, setPersonFailed] = useState(false);
+  const [personFailed, setPersonFailed] = useState<string | null>(null);
 
   async function talkToPerson() {
     setSheet(null);
-    setPersonFailed(false);
+    setPersonFailed(null);
     const { ok, data } = await postJson("/api/chat/handoff", { language, source, project: project.slug });
-    if (!ok) return setPersonFailed(true);
+    if (!ok) return setPersonFailed(requestError(t, data, t.actionFailed));
     setHasContact(data.hasContact);
     addCards([{ type: "handoff", executive: data.executive }]);
   }
@@ -150,7 +155,7 @@ export function ChatScreen({
             </p>
             <MapLink url={card.mapUrl} label={t.directions} />
             <p>
-              <Link href="/visit" className="text-neem underline underline-offset-4">
+              <Link href="/visit" className="inline-flex min-h-11 items-center text-neem underline underline-offset-4">
                 {t.viewVisit}
               </Link>
             </p>
@@ -189,7 +194,7 @@ export function ChatScreen({
       <header className="shrink-0 border-b border-line bg-paper px-4 py-3">
         <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-x-4 gap-y-1">
           <div className="flex min-w-0 items-center gap-3">
-            <Link href="/" className="py-2 text-sm text-muted underline underline-offset-4">
+            <Link href="/" className="inline-flex min-h-11 items-center text-sm text-muted underline underline-offset-4">
               {t.back}
             </Link>
             <h1 className="truncate font-serif text-xl">{project.name}</h1>
@@ -197,41 +202,41 @@ export function ChatScreen({
           <LanguagePicker current={language} />
         </div>
         <div className="mx-auto mt-2 grid max-w-2xl grid-cols-2 gap-2 text-sm">
-          <button type="button" onClick={talkToPerson} className="rounded-md border border-line bg-white px-2 py-2.5 font-medium hover:border-neem">
+          <button type="button" onClick={talkToPerson} className={headerAction}>
             {t.talkToPerson}
           </button>
           {hasVisit ? (
-            <Link href="/visit" className="rounded-md border border-line bg-white px-2 py-2.5 text-center font-medium hover:border-neem">
+            <Link href="/visit" className={headerAction}>
               {t.myVisit}
             </Link>
           ) : (
-            <button type="button" onClick={() => setSheet({})} className="rounded-md border border-line bg-white px-2 py-2.5 font-medium hover:border-neem">
+            <button type="button" onClick={() => setSheet({})} className={headerAction}>
               {t.bookVisit}
             </button>
           )}
         </div>
       </header>
 
-      <main role="log" aria-live="polite" className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="mx-auto max-w-2xl space-y-4">
+      <main className="flex-1 overflow-y-auto px-4 py-6">
+        <div role="log" aria-live="polite" className="mx-auto max-w-2xl space-y-4">
           <p className="max-w-[85%] text-lg">{t.greeting}</p>
 
           {items.length === 0 && (
             <div className="flex flex-wrap gap-2">
-              {[t.suggestHomes, t.suggestParking].map((suggestion) => (
+              {[t.suggestHomes, t.suggestParking].map((text) => (
                 <button
-                  key={suggestion}
+                  key={text}
                   type="button"
-                  onClick={() => send(suggestion)}
-                  className="rounded-full border border-line bg-white px-4 py-2 text-sm hover:border-neem"
+                  onClick={() => send(text)}
+                  className={suggestion}
                 >
-                  {suggestion}
+                  {text}
                 </button>
               ))}
               <button
                 type="button"
                 onClick={() => setSheet({})}
-                className="rounded-full border border-line bg-white px-4 py-2 text-sm hover:border-neem"
+                className={suggestion}
               >
                 {t.suggestVisit}
               </button>
@@ -262,8 +267,8 @@ export function ChatScreen({
 
           {failed && (
             <div role="alert" className="text-sm text-alert">
-              <p>{t.notSent}</p>
-              <button type="button" onClick={() => send(failed, true)} className="mt-1 underline underline-offset-4">
+              <p>{failed.text}</p>
+              <button type="button" onClick={() => send(failed.message, true)} className="min-h-11 underline underline-offset-4">
                 {t.retry}
               </button>
             </div>
@@ -271,8 +276,8 @@ export function ChatScreen({
 
           {personFailed && (
             <div role="alert" className="text-sm text-alert">
-              <p>{t.notSent}</p>
-              <button type="button" onClick={talkToPerson} className="mt-1 underline underline-offset-4">
+              <p>{personFailed}</p>
+              <button type="button" onClick={talkToPerson} className="min-h-11 underline underline-offset-4">
                 {t.retry}
               </button>
             </div>
@@ -309,6 +314,7 @@ export function ChatScreen({
         source={source}
         project={project.slug}
         hasContact={hasContact}
+        showCodes={showCodes}
         startSlot={sheet?.slot}
         contactOnly={sheet?.contactOnly}
         onBooked={onBooked}

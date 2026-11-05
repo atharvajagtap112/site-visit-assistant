@@ -3,13 +3,15 @@ import { z } from "zod";
 import { bookVisit } from "@/lib/booking";
 import { getBuyerState } from "@/lib/buyer";
 import { getConversation } from "@/lib/buyer-session";
+import { readJson } from "@/lib/limits";
 import { formatVisitTime } from "@/lib/format";
+import { getLanguage } from "@/lib/language";
 
 const body = z.object({ slotId: z.number().int().positive().max(2_147_483_647) });
 
 /** The buyer comes only from the cookie, so nobody can book in someone else's name. */
 export async function POST(request: Request) {
-  const parsed = body.safeParse(await request.json().catch(() => null));
+  const parsed = body.safeParse(await readJson(request));
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
 
   const conversation = await getConversation();
@@ -20,7 +22,7 @@ export async function POST(request: Request) {
 
   const state = await getBuyerState(conversation.leadId);
   return NextResponse.json({
-    label: formatVisitTime(result.startsAt),
+    label: formatVisitTime(result.startsAt, await getLanguage()),
     project: state?.visit?.project,
     reraNumber: state?.visit?.reraNumber,
     mapUrl: state?.visit?.mapUrl,

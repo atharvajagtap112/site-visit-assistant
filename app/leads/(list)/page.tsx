@@ -175,7 +175,7 @@ export default async function LeadsPage({
             {rows.map((lead) => (
               <li key={lead.id} className="py-4">
                 <div className="flex items-baseline justify-between gap-3">
-                  <Link href={`/leads/${lead.id}`} className={`py-1 underline ${leadLink}`}>
+                  <Link href={`/leads/${lead.id}`} className={`inline-flex min-h-11 items-center underline ${leadLink}`}>
                     {lead.name ?? "Name not given"}
                   </Link>
                   <p className="text-sm text-muted tabular-nums">LD-{lead.id}</p>

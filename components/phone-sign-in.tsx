@@ -2,11 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { STRINGS, type Language } from "@/lib/i18n";
+import { requestError, STRINGS, type Language } from "@/lib/i18n";
 import { postJson, primaryButton, textInput } from "./ui";
 
 /** Lets a buyer reach their visit from a new phone or browser, after proving the number is theirs. */
-export function PhoneSignIn({ language }: { language: Language }) {
+export function PhoneSignIn({ language, showCodes }: { language: Language; showCodes: boolean }) {
   const t = STRINGS[language];
   const router = useRouter();
   const [phone, setPhone] = useState("");
@@ -23,14 +23,16 @@ export function PhoneSignIn({ language }: { language: Language }) {
       const { ok, data } = await postJson("/api/buyer/code", { phone });
       setBusy(false);
       if (ok) setDemoCode(data.demoCode);
-      else setError(data.error === "phone_invalid" ? t.phoneInvalid : t.notSent);
+      else setError(requestError(t, data, t.actionFailed));
       return;
     }
     const { ok, data } = await postJson("/api/buyer/sign-in", { phone, code });
     setBusy(false);
     if (ok) return router.refresh();
-    setError(data.error === "code_invalid" ? t.codeInvalid : data.error === "no_lead" ? t.noLeadForPhone : t.notSent);
+    setError(requestError(t, data, t.actionFailed));
   }
+
+  if (!showCodes) return <p className="mt-6 max-w-sm rounded-md bg-amber-soft px-3 py-2 text-sm text-amber">{t.codesUnavailable}</p>;
 
   return (
     <form onSubmit={submit} className="mt-6 max-w-sm space-y-4" noValidate>
@@ -48,6 +50,7 @@ export function PhoneSignIn({ language }: { language: Language }) {
           className={`${textInput} font-normal`}
         />
       </label>
+      {!demoCode && <p className="text-sm text-muted">{t.demoCodeNote}</p>}
       {demoCode && (
         <>
           <p className="rounded-md bg-neem-soft px-3 py-2 text-sm">
@@ -83,7 +86,7 @@ export function PhoneSignIn({ language }: { language: Language }) {
             setCode("");
             setError(null);
           }}
-          className="w-full py-1 text-sm text-muted underline underline-offset-4"
+          className="min-h-11 w-full text-sm text-muted underline underline-offset-4"
         >
           {t.newCode}
         </button>

@@ -101,7 +101,7 @@ export function NewLeadForm({ projects }: { projects: { id: number; name: string
         <legend className="text-sm font-medium">Needs</legend>
         <div className="mt-2 flex gap-6">
           {["2 BHK", "3 BHK"].map((home) => (
-            <label key={home} className="flex items-center gap-2 py-1">
+            <label key={home} className="flex min-h-11 items-center gap-2 pr-2">
               <input type="radio" name="wants" value={home} defaultChecked={values.wants === home} className="size-5 accent-neem" />
               {home}
             </label>

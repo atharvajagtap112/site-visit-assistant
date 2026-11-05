@@ -10,7 +10,7 @@ export default async function SignInPage() {
   if (await getCurrentUser()) redirect("/leads");
 
   return (
-    <div className="grid min-h-dvh md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+    <div lang="en" className="grid min-h-dvh md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <main className="flex flex-col justify-center px-6 py-14 sm:px-16">
         <div className="mx-auto w-full max-w-sm">
           <p className="font-serif text-xl">Company A Homes</p>

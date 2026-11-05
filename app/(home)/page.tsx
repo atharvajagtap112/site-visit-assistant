@@ -9,10 +9,12 @@ import { leadSourceEnum, projects } from "@/db/schema";
 import { STRINGS } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
 
-export const metadata: Metadata = {
-  title: "Homes in Ahmedabad | Company A Homes",
-  description: "2 and 3 BHK homes in Ahmedabad. Ask a question or book a site visit at any hour.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: STRINGS[await getLanguage()].homeMetaTitle,
+    description: "2 and 3 BHK homes in Ahmedabad. Ask a question or book a site visit at any hour.",
+  };
+}
 
 // Each project gets its own drawing until the client supplies photography. The panel crops from
 // the top, so the lit home sits in the lower floors, which show at every screen width.
@@ -67,7 +69,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
                   {project.name}
                 </h2>
                 <p className="mt-3 text-lg">{project.homes}</p>
-                <p className="mt-1 text-lg tabular-nums">{project.priceRange}</p>
+                <p className="mt-1 text-lg tabular-nums">{project.priceRange.replace(/\blakh\b/gi, t.lakh).replace(/\bcrore\b/gi, t.crore)}</p>
                 <p className="mt-3 text-sm text-muted">{t.exactPriceNote}</p>
                 <p className="mt-1 text-sm text-muted">
                   {t.rera}: {project.reraNumber}
@@ -85,10 +87,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
       </main>
 
       <footer className="mx-auto flex max-w-6xl flex-wrap gap-x-6 gap-y-2 border-t border-line px-5 py-8 text-sm text-muted sm:px-8">
-        <Link href="/visit" className="underline underline-offset-4">
+        <Link href="/visit" className="inline-flex min-h-11 items-center underline underline-offset-4">
           {t.myVisit}
         </Link>
-        <Link href="/sign-in" className="underline underline-offset-4">
+        <Link href="/sign-in" className="inline-flex min-h-11 items-center underline underline-offset-4">
           {t.staffSignIn}
         </Link>
       </footer>

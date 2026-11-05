@@ -6,10 +6,11 @@ import { STRINGS, type Language } from "@/lib/i18n";
 import { BookingSheet } from "./booking-sheet";
 import { postJson, primaryButton, secondaryButton } from "./ui";
 
-export function VisitActions({ language, project }: { language: Language; project: string }) {
+export function VisitActions({ language, project, showCodes }: { language: Language; project: string; showCodes: boolean }) {
   const t = STRINGS[language];
   const router = useRouter();
   const confirm = useRef<HTMLDialogElement>(null);
+  const keep = useRef<HTMLButtonElement>(null);
   const [changing, setChanging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -28,20 +29,28 @@ export function VisitActions({ language, project }: { language: Language; projec
     <div>
       {failed && (
         <p role="alert" className="mb-3 text-sm text-alert">
-          {t.bookingFailed}
+          {t.actionFailed}
         </p>
       )}
       <div className="grid gap-2 sm:grid-cols-2">
         <button type="button" onClick={() => setChanging(true)} className={secondaryButton}>
           {t.reschedule}
         </button>
-        <button type="button" onClick={() => confirm.current?.showModal()} className={`${secondaryButton} text-alert`}>
+        <button
+          type="button"
+          onClick={() => {
+            confirm.current?.showModal();
+            // A native dialog focuses its first button, and here that one cancels the visit.
+            keep.current?.focus();
+          }}
+          className={`${secondaryButton} text-alert`}
+        >
           {t.cancelVisit}
         </button>
       </div>
 
       <dialog ref={confirm} lang={language} aria-label={t.cancelVisit} className="m-auto w-full max-w-sm rounded-lg bg-paper p-5 text-ink">
-        <p className="font-serif text-2xl">{t.cancelVisit}</p>
+        <h2 className="font-serif text-2xl">{t.cancelVisit}</h2>
         <button
           type="button"
           disabled={busy}
@@ -50,7 +59,7 @@ export function VisitActions({ language, project }: { language: Language; projec
         >
           {t.confirmCancel}
         </button>
-        <button type="button" onClick={() => confirm.current?.close()} className={`mt-2 w-full ${secondaryButton}`}>
+        <button ref={keep} type="button" onClick={() => confirm.current?.close()} className={`mt-2 w-full ${secondaryButton}`}>
           {t.close}
         </button>
       </dialog>
@@ -62,6 +71,7 @@ export function VisitActions({ language, project }: { language: Language; projec
         language={language}
         project={project}
         hasContact
+        showCodes={showCodes}
         reschedule
         onRescheduled={() => {
           setChanging(false);
@@ -74,7 +84,7 @@ export function VisitActions({ language, project }: { language: Language; projec
 }
 
 /** For a visit whose time has passed. Booking closes that visit, so the buyer is never locked out. */
-export function BookAgain({ language, project }: { language: Language; project: string }) {
+export function BookAgain({ language, project, showCodes }: { language: Language; project: string; showCodes: boolean }) {
   const t = STRINGS[language];
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -91,6 +101,7 @@ export function BookAgain({ language, project }: { language: Language; project: 
         language={language}
         project={project}
         hasContact
+        showCodes={showCodes}
         onBooked={() => {
           setOpen(false);
           router.replace("/visit?done=booked");
@@ -122,7 +133,7 @@ export function OptOut({ language }: { language: Language }) {
       <p className="mt-1 text-sm text-muted">{t.optOutHelp}</p>
       {failed && (
         <p role="alert" className="mt-2 text-sm text-alert">
-          {t.notSent}
+          {t.actionFailed}
         </p>
       )}
       <button type="button" disabled={busy} onClick={optOut} className={`mt-3 ${secondaryButton}`}>

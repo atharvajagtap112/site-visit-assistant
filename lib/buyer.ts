@@ -5,8 +5,11 @@ import { conversations, leads, messages, otpCodes, projects, slots, users, visit
 import { assignExecutive } from "./assistant";
 import { hashToken } from "./auth";
 
-const CODE_MINUTES = 10;
+export const CODE_SECONDS = 10 * 60;
 const MAX_CODE_ATTEMPTS = 5;
+
+/** Fails closed: anything but an explicit yes means codes are never handed back to the browser. */
+export const showCodes = () => process.env.DEMO_SHOW_CODES === "yes";
 
 /** Returns +91 followed by 10 digits, or null if this is not an Indian mobile number. */
 export function normalisePhone(raw: string) {
@@ -19,16 +22,25 @@ const hashCode = (phone: string, code: string) => hashToken(`${phone}:${code}`);
 /**
  * ponytail: sending is simulated, so the caller shows this code on screen. A real SMS provider
  * replaces that one step; checking the code stays the same.
+ *
+ * A new code keeps the tries already used, or asking for one would be a free reset of the guess
+ * limit. They clear once the last code expires. Returns null while the limit is used up, and that
+ * wait is not extended, so a locked buyer is back in within CODE_SECONDS.
  */
 export async function startCode(phone: string) {
   const code = String(randomInt(100_000, 1_000_000));
-  const values = {
-    codeHash: hashCode(phone, code),
-    expiresAt: new Date(Date.now() + CODE_MINUTES * 60 * 1000),
-    attempts: 0,
-  };
-  await db.insert(otpCodes).values({ phone, ...values }).onConflictDoUpdate({ target: otpCodes.phone, set: values });
-  return code;
+  const values = { codeHash: hashCode(phone, code), expiresAt: new Date(Date.now() + CODE_SECONDS * 1000) };
+  const expired = sql`${otpCodes.expiresAt} <= now()`;
+  const [saved] = await db
+    .insert(otpCodes)
+    .values({ phone, ...values, attempts: 0 })
+    .onConflictDoUpdate({
+      target: otpCodes.phone,
+      set: { ...values, attempts: sql`CASE WHEN ${expired} THEN 0 ELSE ${otpCodes.attempts} END` },
+      setWhere: sql`${expired} OR ${otpCodes.attempts} < ${MAX_CODE_ATTEMPTS}`,
+    })
+    .returning({ phone: otpCodes.phone });
+  return saved ? code : null;
 }
 
 /** A code works once. Each try counts first, so parallel guesses cannot beat the attempt limit. */

@@ -154,7 +154,7 @@ export default async function DashboardPage({
             key={key}
             href={`/dashboard?range=${key}`}
             aria-current={key === range ? "page" : undefined}
-            className={`py-2 underline-offset-4 hover:underline ${key === range ? "font-medium underline" : "text-muted"}`}
+            className={`inline-flex min-h-11 items-center underline-offset-4 hover:underline ${key === range ? "font-medium underline" : "text-muted"}`}
           >
             {RANGES[key].label}
           </Link>
@@ -189,7 +189,7 @@ export default async function DashboardPage({
         <div className="mt-12 max-w-md">
           <p className="font-serif text-2xl">No leads in this period</p>
           <p className="mt-2 text-muted">The targets and the table fill in once a first enquiry falls in the period. Try a longer one.</p>
-          <Link href="/dashboard?range=all" className="mt-4 inline-block py-2 underline underline-offset-4">
+          <Link href="/dashboard?range=all" className="mt-4 inline-flex min-h-11 items-center underline underline-offset-4">
             Show all time
           </Link>
         </div>

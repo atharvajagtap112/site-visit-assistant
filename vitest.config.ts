@@ -4,6 +4,7 @@ import { defineConfig } from "vitest/config";
 if (existsSync(".env")) process.loadEnvFile(".env");
 
 export default defineConfig({
+  resolve: { alias: { "@": import.meta.dirname } },
   test: {
     // Review agents work in git worktrees under .claude/.
     exclude: ["node_modules/**", ".claude/**"],

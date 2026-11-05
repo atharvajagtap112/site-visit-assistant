@@ -4,16 +4,16 @@ import { signOut } from "@/app/sign-in/actions";
 import { unreviewedCount } from "@/lib/admin";
 import type { SessionUser } from "@/lib/auth";
 
-const navLink = "rounded px-1 py-2 font-medium underline-offset-4 hover:underline";
+const navLink = "inline-flex min-h-11 items-center rounded px-1 font-medium underline-offset-4 hover:underline";
 
 export async function StaffShell({ user, children }: { user: SessionUser; children: ReactNode }) {
   const isHead = user.role === "sales_head";
   const toReview = isHead ? await unreviewedCount(user) : 0;
 
   return (
-    <div className="mx-auto max-w-6xl px-5 pb-20 sm:px-8">
+    <div lang="en" className="mx-auto max-w-6xl px-5 pb-20 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-line py-4">
-        <Link href="/leads" className="font-serif text-xl">
+        <Link href="/leads" className="inline-flex min-h-11 items-center font-serif text-xl">
           Company A Homes
         </Link>
         <div className="flex flex-wrap items-center gap-x-4">

@@ -6,7 +6,7 @@ const HOUR = 60 * 60 * 1000;
 
 export const resetDb = () =>
   db.execute(
-    sql`TRUNCATE otp_codes, messages, visits, slots, leads, projects, sessions, users RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE rate_limits, otp_codes, messages, visits, slots, leads, projects, sessions, users RESTART IDENTITY CASCADE`,
   );
 
 export async function makeStaff(email: string, role: "executive" | "sales_head" = "executive") {

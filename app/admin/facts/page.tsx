@@ -21,7 +21,7 @@ function FactGroup({ facts, projectId }: { facts: Fact[]; projectId: number | nu
         </ul>
       )}
       <details className="mt-4">
-        <summary className="cursor-pointer py-2 font-medium underline underline-offset-4">Add a fact</summary>
+        <summary className="cursor-pointer py-2.5 font-medium underline underline-offset-4">Add a fact</summary>
         <FactForm projectId={projectId} label="Add fact" />
       </details>
     </>

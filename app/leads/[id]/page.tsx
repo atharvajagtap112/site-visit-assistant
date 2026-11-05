@@ -27,6 +27,7 @@ import {
   markContactedAction,
   reassignAction,
   recordConsentAction,
+  recordOptOutAction,
   recordShowUpAction,
   rescheduleAction,
   setClosedAction,
@@ -114,7 +115,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   return (
     <main>
       <p className="mt-6 text-sm">
-        <Link href="/leads" className="underline underline-offset-4">
+        <Link href="/leads" className="inline-flex min-h-11 items-center underline underline-offset-4">
           Back to leads
         </Link>
       </p>
@@ -158,7 +159,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           ) : optedOut ? (
             <span className="tabular-nums">{lead.phone}</span>
           ) : (
-            <a href={`tel:${lead.phone}`} className="text-neem underline underline-offset-4 tabular-nums">
+            <a href={`tel:${lead.phone}`} className="inline-flex min-h-11 items-center text-neem underline underline-offset-4 tabular-nums">
               {lead.phone}
             </a>
           )}
@@ -191,7 +192,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
       <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* A new key after any change clears errors from earlier attempts, which no longer apply. */}
-        <div key={`${lead.status}-${lead.consentAt ? 1 : 0}-${visit?.id}-${visit?.status}`} className="space-y-10 lg:order-2">
+        <div key={`${lead.status}-${lead.consentAt ? 1 : 0}-${visit?.id}-${visit?.status}-${optedOut}`} className="space-y-10 lg:order-2">
           <Section title="Visit">
             {visit ? (
               <div className="mt-3">
@@ -302,7 +303,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                           fields={{ leadId: lead.id, visitId: earlier.id, outcome: earlier.status === "visited" ? "no_show" : "visited" }}
                           label={earlier.status === "visited" ? "Correct to no-show" : "Correct to visited"}
                           pendingLabel="Saving"
-                          buttonClass="py-1 text-left text-neem underline underline-offset-4 disabled:opacity-60"
+                          buttonClass="min-h-11 text-left text-neem underline underline-offset-4 disabled:opacity-60"
                         />
                       )}
                     </li>
@@ -339,6 +340,20 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                     )}
                   </label>
                 </ActionForm>
+              )}
+              {!optedOut && (
+                <ActionForm
+                  action={recordOptOutAction}
+                  fields={fields}
+                  label="Record opt-out"
+                  pendingLabel="Saving"
+                  buttonClass={`${secondaryButton} text-alert`}
+                  confirm={{
+                    question: "Did the buyer ask not to be contacted? Calling, booking and reminders stop for every enquiry from this phone, and only the buyer can turn them back on.",
+                    yes: "Yes, record opt-out",
+                    no: "Go back",
+                  }}
+                />
               )}
             </div>
           </Section>
