@@ -6,7 +6,8 @@ export const LANGUAGE_NAMES: Record<Language, string> = { en: "English", hi: "�
 const en = {
   homeTitle: "Homes in Ahmedabad. Ask anything, or book a visit, at any hour.",
   noProjects: "Project details are being updated. Please check back soon.",
-  illustration: "Illustration of the building",
+  illustration: "Apartment towers",
+  samplePhoto: "Sample photo, not this project.",
   exactPriceNote: "Our sales team confirms the exact price of each home.",
   rera: "RERA registration",
   askOrBook: "Ask or book a visit",
@@ -99,7 +100,8 @@ export type Strings = typeof en;
 const hi: Strings = {
   homeTitle: "अहमदाबाद में घर। कुछ भी पूछें या किसी भी समय विज़िट बुक करें।",
   noProjects: "प्रोजेक्ट की जानकारी अपडेट हो रही है। कृपया जल्द ही फिर देखें।",
-  illustration: "इमारत का चित्र",
+  illustration: "अपार्टमेंट की इमारतें",
+  samplePhoto: "नमूने की फ़ोटो। यह इस प्रोजेक्ट की इमारत नहीं है।",
   exactPriceNote: "हर घर की सटीक कीमत हमारी सेल्स टीम बताती है।",
   rera: "RERA पंजीकरण",
   askOrBook: "पूछें या विज़िट बुक करें",
@@ -190,7 +192,8 @@ const hi: Strings = {
 const gu: Strings = {
   homeTitle: "અમદાવાદમાં ઘર. કંઈ પણ પૂછો અથવા કોઈ પણ સમયે મુલાકાત બુક કરો.",
   noProjects: "પ્રોજેક્ટની માહિતી અપડેટ થઈ રહી છે. કૃપા કરીને થોડી વાર પછી જુઓ.",
-  illustration: "ઇમારતનું ચિત્ર",
+  illustration: "એપાર્ટમેન્ટની ઇમારતો",
+  samplePhoto: "નમૂનાનો ફોટો. આ આ પ્રોજેક્ટની ઇમારત નથી.",
   exactPriceNote: "દરેક ઘરની ચોક્કસ કિંમત અમારી સેલ્સ ટીમ જણાવે છે.",
   rera: "RERA નોંધણી",
   askOrBook: "પૂછો અથવા મુલાકાત બુક કરો",

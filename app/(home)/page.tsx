@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { asc } from "drizzle-orm";
 import { z } from "zod";
-import { Elevation, Tower } from "@/components/elevation";
 import { LanguagePicker } from "@/components/language-picker";
 import { db } from "@/db";
 import { leadSourceEnum, projects } from "@/db/schema";
@@ -16,18 +16,21 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Each project gets its own drawing until the client supplies photography. The panel crops from
-// the top, so the lit home sits in the lower floors, which show at every screen width.
-const DRAWINGS = [
-  [
-    { x: 150, floors: 17, cols: 6, lit: [14, 3] as [number, number] },
-    { x: 410, floors: 12, cols: 6 },
-  ],
-  [
-    { x: 60, floors: 10, cols: 5 },
-    { x: 260, floors: 15, cols: 5, lit: [12, 1] as [number, number] },
-    { x: 460, floors: 10, cols: 5 },
-  ],
+// ponytail: sample photos of other buildings until the client supplies its own, so each is labelled
+// as a sample. RERA rules out implying that a photo shows the registered project.
+const PHOTOS = [
+  {
+    src: "/images/project-1.jpg",
+    position: "50% 42%",
+    credit: "Nikhilb239, CC BY 3.0, cropped",
+    url: "https://commons.wikimedia.org/wiki/File:Residential_Building,_Hyderabad,_20022015.jpg",
+  },
+  {
+    src: "/images/project-2.jpg",
+    position: "50% 55%",
+    credit: "Sanfy, CC BY-SA 4.0, cropped",
+    url: "https://commons.wikimedia.org/wiki/File:Tower_blocks_in_Mira_Road.jpg",
+  },
 ];
 
 const source = z.enum(leadSourceEnum.enumValues).catch("website");
@@ -56,13 +59,25 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
 
         {rows.map((project, index) => (
           <section key={project.id} aria-labelledby={`project-${project.id}`} className="mb-20">
-            <div className="relative h-56 overflow-hidden bg-neem sm:h-72" role="img" aria-label={t.illustration}>
-              <Elevation>
-                {DRAWINGS[index % DRAWINGS.length].map((tower) => (
-                  <Tower key={tower.x} {...tower} />
-                ))}
-              </Elevation>
-            </div>
+            <figure>
+              <div className="relative h-56 overflow-hidden bg-line sm:h-80">
+                <Image
+                  src={PHOTOS[index % PHOTOS.length].src}
+                  alt={t.illustration}
+                  fill
+                  sizes="100vw"
+                  priority={index === 0}
+                  className="object-cover"
+                  style={{ objectPosition: PHOTOS[index % PHOTOS.length].position }}
+                />
+              </div>
+              <figcaption className="mx-auto max-w-6xl px-5 pt-2 text-sm text-muted sm:px-8">
+                {t.samplePhoto}{" "}
+                <a href={PHOTOS[index % PHOTOS.length].url} lang="en" className="inline-flex min-h-11 items-center underline underline-offset-4 sm:min-h-0">
+                  Photo: {PHOTOS[index % PHOTOS.length].credit}
+                </a>
+              </figcaption>
+            </figure>
             <div className="mx-auto grid max-w-6xl gap-6 px-5 pt-8 sm:px-8 md:grid-cols-[1fr_auto] md:items-end">
               <div>
                 <h2 id={`project-${project.id}`} className="font-serif text-3xl sm:text-4xl">
