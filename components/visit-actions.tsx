@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { STRINGS, type Language } from "@/lib/i18n";
 import { BookingSheet } from "./booking-sheet";
-import { postJson, primaryButton, secondaryButton } from "./ui";
+import { card, postJson, primaryButton, secondaryButton } from "./ui";
 
 export function VisitActions({ language, project, showCodes }: { language: Language; project: string; showCodes: boolean }) {
   const t = STRINGS[language];
@@ -49,13 +49,13 @@ export function VisitActions({ language, project, showCodes }: { language: Langu
         </button>
       </div>
 
-      <dialog ref={confirm} lang={language} aria-label={t.cancelVisit} className="m-auto w-full max-w-sm rounded-lg bg-paper p-5 text-ink">
+      <dialog ref={confirm} lang={language} aria-label={t.cancelVisit} className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-ink">
         <h2 className="font-serif text-2xl">{t.cancelVisit}</h2>
         <button
           type="button"
           disabled={busy}
           onClick={cancel}
-          className="mt-5 w-full rounded-md bg-alert px-5 py-3 font-medium text-white disabled:opacity-60"
+          className="mt-5 min-h-11 w-full rounded-full bg-alert px-5 py-2.5 font-medium text-white disabled:opacity-60"
         >
           {t.confirmCancel}
         </button>
@@ -128,7 +128,7 @@ export function OptOut({ language }: { language: Language }) {
   }
 
   return (
-    <section className="mt-10 border-t border-line pt-6">
+    <section className={`mt-4 ${card}`}>
       <h2 className="font-medium">{t.optOutTitle}</h2>
       <p className="mt-1 text-sm text-muted">{t.optOutHelp}</p>
       {failed && (

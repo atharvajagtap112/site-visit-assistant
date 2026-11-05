@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
-import { secondaryButton } from "@/components/ui";
+import { Avatar, Pill } from "@/components/bits";
+import { card, chip, pageTitle, secondaryButton } from "@/components/ui";
 import { FLAG_FILTERS, listFlagged, parseFlagFilter, type FlagFilter } from "@/lib/admin";
 import { flagLabel, formatVisitTime } from "@/lib/format";
 import { requireHead } from "@/lib/session";
@@ -29,17 +30,17 @@ export default async function FlaggedPage({
   const { rows, total, page, pageCount } = await listFlagged(user, filter, Number.isSafeInteger(requested) && requested > 0 ? requested : 1);
 
   return (
-    <main className="max-w-3xl">
-      <h1 className="mt-6 font-serif text-4xl">Flagged chats</h1>
+    <main className="max-w-4xl">
+      <h1 className={`mt-6 ${pageTitle}`}>Flagged chats</h1>
       <p className="mt-2 text-muted">The buyer never saw these drafts. They saw the reply sent instead, and the chat went to a person.</p>
 
-      <nav aria-label="Filter flagged chats" className="mt-4 flex flex-wrap gap-x-5">
+      <nav aria-label="Filter flagged chats" className="mt-4 flex flex-wrap gap-2">
         {(Object.keys(FLAG_FILTERS) as FlagFilter[]).map((key) => (
           <Link
             key={key}
             href={href(key)}
             aria-current={key === filter ? "page" : undefined}
-            className={`inline-flex min-h-11 items-center underline-offset-4 hover:underline ${key === filter ? "font-medium underline" : "text-muted"}`}
+            className={chip(key === filter)}
           >
             {FLAG_FILTERS[key]}
           </Link>
@@ -47,17 +48,18 @@ export default async function FlaggedPage({
       </nav>
 
       {rows.length === 0 ? (
-        <p className="mt-10 text-muted">{EMPTY[filter]}</p>
+        <p className={`mt-6 text-muted ${card}`}>{EMPTY[filter]}</p>
       ) : (
         <>
           <p className="mt-4 text-sm text-muted tabular-nums">
             {total} {total === 1 ? "chat" : "chats"}, newest first
           </p>
-          <ul className="mt-2 divide-y divide-line border-y border-line">
+          <ul className="mt-3 space-y-4">
             {rows.map((chat) => (
-              <li key={chat.id} className="py-6">
+              <li key={chat.id} className={card}>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-                  <Link href={`/leads/${chat.leadId}`} className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
+                  <Link href={`/leads/${chat.leadId}`} className="inline-flex min-h-11 items-center gap-3 font-medium underline underline-offset-4">
+                    <Avatar name={chat.leadName} />
                     LD-{chat.leadId}, {chat.leadName ?? "name not given"}
                   </Link>
                   {chat.flaggedAt && <span className="text-sm text-muted tabular-nums">{formatVisitTime(chat.flaggedAt)}</span>}
@@ -71,7 +73,7 @@ export default async function FlaggedPage({
                       <dt className="text-sm text-muted">Buyer wrote</dt>
                       <dd className="mt-0.5 break-words whitespace-pre-wrap">{turn.buyerMessage ?? "No buyer message found."}</dd>
                     </div>
-                    <div className="rounded-md bg-amber-soft px-3 py-2">
+                    <div className="rounded-xl bg-amber-soft px-3 py-2">
                       <dt className="text-sm font-medium text-amber">Withheld draft, staff only</dt>
                       <dd className="mt-0.5 break-words whitespace-pre-wrap">{turn.draft}</dd>
                     </div>
@@ -84,7 +86,7 @@ export default async function FlaggedPage({
 
                 <div className="mt-4">
                   {chat.reviewedAt ? (
-                    <p className="text-sm text-muted tabular-nums">Reviewed {formatVisitTime(chat.reviewedAt)}</p>
+                    <Pill tone="green" icon="check">Reviewed {formatVisitTime(chat.reviewedAt)}</Pill>
                   ) : (
                     <div className="sm:w-56">
                       <ActionForm action={markReviewedAction} fields={{ conversationId: chat.id }} label="Mark as reviewed" pendingLabel="Saving" />

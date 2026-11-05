@@ -33,7 +33,7 @@ export default async function ChatPage({
   const project =
     rows.find((p) => p.slug === params.project) ?? rows.find((p) => p.id === state?.projectId) ?? rows[0];
 
-  if (!project) return <main lang={language} className="p-8 text-muted">{STRINGS[language].noProjects}</main>;
+  if (!project) return <main lang={language} className="mx-auto mt-16 max-w-md rounded-3xl bg-white p-8 text-muted shadow-soft max-sm:mx-4">{STRINGS[language].noProjects}</main>;
 
   return (
     <ChatScreen

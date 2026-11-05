@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useRef } from "react";
-import { primaryButton, secondaryButton, textInput } from "@/components/ui";
+import { card, primaryButton, secondaryButton, textInput } from "@/components/ui";
 import { SOURCE_LABELS } from "@/lib/format";
 import { createLeadAction, type NewLeadValues } from "../actions";
 
@@ -24,9 +24,9 @@ export function NewLeadForm({ projects }: { projects: { id: number; name: string
 
   return (
     // React resets a form after its action, so the key remounts it with what was entered.
-    <form key={JSON.stringify(state)} ref={form} action={action} noValidate className="mt-8 space-y-5">
+    <form key={JSON.stringify(state)} ref={form} action={action} noValidate className={`mt-6 space-y-5 ${card}`}>
       {state?.saved && (
-        <p role="status" className="rounded-md bg-neem-soft px-3 py-2">
+        <p role="status" className="rounded-xl bg-neem-soft px-3 py-2">
           Saved as LD-{state.saved.id}, linked to LD-{state.saved.duplicateOfId}. It stays with{" "}
           {state.saved.executive ?? "the sales team"}, who already handles this buyer.
         </p>
@@ -45,7 +45,7 @@ export function NewLeadForm({ projects }: { projects: { id: number; name: string
       </label>
 
       {state?.duplicate && (
-        <div role="alert" className="rounded-md bg-amber-soft px-4 py-3">
+        <div role="alert" className="rounded-xl bg-amber-soft px-4 py-3">
           <p className="font-medium text-amber">This phone number is already on a lead</p>
           <p className="mt-1 text-sm">
             {state.duplicate.canOpen ? (

@@ -16,7 +16,7 @@ export default function ErrorPage({ retry }: { retry: () => void }) {
   const t = STRINGS[language];
 
   return (
-    <main lang={language} className="mx-auto max-w-md px-6 py-24">
+    <main lang={language} className="mx-auto mt-16 max-w-md rounded-3xl bg-white p-8 shadow-soft max-sm:mx-4">
       <h1 className="font-serif text-3xl">{t.errorTitle}</h1>
       <p role="alert" className="mt-3 text-muted">
         {t.errorHelp}

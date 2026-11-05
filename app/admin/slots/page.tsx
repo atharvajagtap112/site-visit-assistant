@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
-import { secondaryButton, textInput } from "@/components/ui";
+import { Pill } from "@/components/bits";
+import { card, pageTitle, secondaryButton, sectionTitle, textInput } from "@/components/ui";
 import { addDays, indiaInstant, listSlots, parseSlotFilters } from "@/lib/admin";
 import { indiaDate } from "@/lib/format";
 import { listProjects } from "@/lib/leads";
@@ -14,7 +15,7 @@ export const metadata: Metadata = { title: "Slots | Company A Homes", robots: "n
 
 const TIME = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true });
 const DAY_TITLE = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
-const compactButton = "min-h-11 rounded-md border border-line bg-white px-4 text-sm font-medium hover:border-neem disabled:opacity-60";
+const compactButton = "min-h-11 rounded-full border border-line-strong bg-white px-4 text-sm font-medium hover:border-neem hover:bg-neem-soft disabled:opacity-60";
 
 const VISIT_WORDS = { booked: "Booked by", visited: "Visited,", no_show: "No-show," } as const;
 
@@ -34,12 +35,12 @@ export default async function SlotsPage({
   const projectName = projects.find((p) => p.id === project)?.name ?? "";
 
   return (
-    <main className="max-w-3xl">
-      <h1 className="mt-6 font-serif text-4xl">Slots</h1>
+    <main className="max-w-4xl">
+      <h1 className={`mt-6 ${pageTitle}`}>Slots</h1>
       <p className="mt-2 text-muted">All times are India time. Buyers can only pick open, future times with nobody booked.</p>
 
       {/* The key resets the inputs when Earlier or Later changes the URL under them. */}
-      <Form key={`${project}${from}${to}`} action="/admin/slots" className="mt-6 grid grid-cols-2 items-end gap-3 sm:grid-cols-4">
+      <Form key={`${project}${from}${to}`} action="/admin/slots" className={`mt-5 grid grid-cols-2 items-end gap-3 sm:grid-cols-4 ${card}`}>
         <label className="col-span-2 block text-sm font-medium sm:col-span-1">
           Project
           <select name="project" defaultValue={project} className={`${textInput} font-normal`}>
@@ -61,26 +62,26 @@ export default async function SlotsPage({
         <button className={`col-span-2 sm:col-span-1 ${secondaryButton}`}>Show</button>
       </Form>
       {shortened && (
-        <p role="status" className="mt-3 rounded-md bg-amber-soft px-3 py-2 text-amber">
+        <p role="status" className="mt-3 rounded-xl bg-amber-soft px-3 py-2 text-amber">
           One view holds 14 days at most, so this shows the first 14. Use Later for the rest.
         </p>
       )}
 
       {rows.length === 0 ? (
-        <p className="mt-10 text-muted">No slots in this range for {projectName}. Add some below, or choose other dates.</p>
+        <p className={`mt-6 text-muted ${card}`}>No slots in this range for {projectName}. Add some below, or choose other dates.</p>
       ) : (
-        <div className="mt-8 space-y-8">
+        <div className="mt-6 space-y-4">
           {days.map((day) => (
-            <section key={day}>
-              <h2 className="font-serif text-xl">{DAY_TITLE.format(indiaInstant(day))}</h2>
-              <ul className="mt-2 divide-y divide-line border-y border-line">
+            <section key={day} className={card}>
+              <h2 className={sectionTitle}>{DAY_TITLE.format(indiaInstant(day))}</h2>
+              <ul className="mt-2 divide-y divide-line">
                 {rows
                   .filter((slot) => indiaDate(slot.startsAt) === day)
                   .map((slot) => {
                     const past = slot.startsAt <= now;
                     return (
                       <li key={slot.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2.5">
-                        <div className="flex flex-wrap items-baseline gap-x-4">
+                        <div className="flex flex-wrap items-center gap-x-4">
                           <span className="w-20 tabular-nums">{TIME.format(slot.startsAt)}</span>
                           {slot.visitStatus && slot.leadId ? (
                             <span>
@@ -90,9 +91,9 @@ export default async function SlotsPage({
                               </Link>
                             </span>
                           ) : !slot.isOpen ? (
-                            <span className="text-amber">Closed</span>
+                            <Pill tone="amber">Closed</Pill>
                           ) : (
-                            <span className={past ? "text-muted" : ""}>{past ? "Open, passed with no booking" : "Open"}</span>
+                            past ? <span className="text-muted">Open, passed with no booking</span> : <Pill tone="green">Open</Pill>
                           )}
                         </div>
                         {!past && (

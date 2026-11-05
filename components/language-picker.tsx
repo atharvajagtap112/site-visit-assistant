@@ -13,7 +13,7 @@ export function LanguagePicker({ current }: { current: Language }) {
   }
 
   return (
-    <div role="group" aria-label={STRINGS[current].languageLabel} className="flex gap-1 text-sm">
+    <div role="group" aria-label={STRINGS[current].languageLabel} className="flex gap-0.5 rounded-full bg-white p-0.5 text-sm ring-1 ring-line">
       {LANGUAGES.map((language) => (
         <button
           key={language}
@@ -21,7 +21,7 @@ export function LanguagePicker({ current }: { current: Language }) {
           lang={language}
           aria-pressed={language === current}
           onClick={() => choose(language)}
-          className={`min-h-11 rounded px-2.5 ${language === current ? "bg-neem-soft font-medium text-neem" : "text-muted hover:text-ink"}`}
+          className={`min-h-11 rounded-full px-3 ${language === current ? "bg-neem font-medium text-white" : "text-muted hover:text-ink"}`}
         >
           {LANGUAGE_NAMES[language]}
         </button>

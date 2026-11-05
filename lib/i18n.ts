@@ -93,6 +93,9 @@ const en = {
   tooManyTries: "Too many tries. Wait about {n} min, then try again.",
   codesUnavailable: "We cannot send text messages right now, so we cannot confirm your number here. Please try again later, or talk to a person.",
   demoCodeNote: "In this demo no text message is sent. Your code appears on this screen.",
+  homesLabel: "Homes",
+  priceLabel: "Price range",
+  locationLabel: "Location",
 };
 
 export type Strings = typeof en;
@@ -187,6 +190,9 @@ const hi: Strings = {
   tooManyTries: "बहुत ज़्यादा कोशिशें हो गईं। लगभग {n} मिनट रुकें, फिर कोशिश करें।",
   codesUnavailable: "हम अभी SMS नहीं भेज पा रहे, इसलिए यहां आपका नंबर पक्का नहीं हो सकता। कृपया बाद में कोशिश करें या किसी व्यक्ति से बात करें।",
   demoCodeNote: "इस डेमो में कोई SMS नहीं भेजा जाता। आपका कोड इसी स्क्रीन पर दिखेगा।",
+  homesLabel: "घर",
+  priceLabel: "कीमत की सीमा",
+  locationLabel: "स्थान",
 };
 
 const gu: Strings = {
@@ -279,6 +285,9 @@ const gu: Strings = {
   tooManyTries: "ઘણા બધા પ્રયાસ થઈ ગયા. લગભગ {n} મિનિટ રાહ જુઓ, પછી ફરી પ્રયાસ કરો.",
   codesUnavailable: "અમે અત્યારે SMS મોકલી શકતા નથી, તેથી અહીં તમારો નંબર ચકાસી શકાતો નથી. કૃપા કરીને પછી પ્રયાસ કરો અથવા કોઈ વ્યક્તિ સાથે વાત કરો.",
   demoCodeNote: "આ ડેમોમાં કોઈ SMS મોકલાતો નથી. તમારો કોડ આ જ સ્ક્રીન પર દેખાશે.",
+  homesLabel: "ઘર",
+  priceLabel: "કિંમતની શ્રેણી",
+  locationLabel: "સ્થળ",
 };
 
 export const STRINGS: Record<Language, Strings> = { en, hi, gu };

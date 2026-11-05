@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Logo } from "@/components/bits";
+import { Icon } from "@/components/icons";
 import { LanguagePicker } from "@/components/language-picker";
 import { MapLink } from "@/components/map-link";
 import { PhoneSignIn } from "@/components/phone-sign-in";
-import { primaryButton } from "@/components/ui";
+import { card, primaryButton } from "@/components/ui";
 import { BookAgain, OptOut, VisitActions } from "@/components/visit-actions";
 import { getBuyerState, showCodes } from "@/lib/buyer";
 import { getConversation } from "@/lib/buyer-session";
@@ -28,82 +30,97 @@ export default async function VisitPage({ searchParams }: { searchParams: Promis
   const notice = done && Object.hasOwn(notices, done) ? notices[done] : null;
 
   return (
-    <div lang={language} className="mx-auto min-h-dvh max-w-2xl px-5 py-5 sm:px-8">
-      <header className="flex items-center justify-between gap-4">
-        <Link href="/" className="inline-flex min-h-11 items-center font-serif text-lg whitespace-nowrap sm:text-xl">
-          Company A Homes
+    <div lang={language} className="mx-auto min-h-dvh max-w-2xl px-4 py-4 sm:px-8">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <Link href="/">
+          <Logo />
         </Link>
         <LanguagePicker current={language} />
       </header>
 
-      <main className="pt-10 pb-16">
+      <main className="pt-8 pb-16">
         <h1 className="font-serif text-4xl">{t.visitTitle}</h1>
 
         {notice && (
-          <p role="status" className="mt-4 rounded-md bg-neem-soft px-3 py-2">
+          <p role="status" className="mt-4 flex items-center gap-2 rounded-2xl bg-neem-soft px-4 py-3 text-neem">
+            <Icon name="check" />
             {notice}
           </p>
         )}
 
         {visit ? (
           <>
-            <p className="mt-8 font-serif text-3xl tabular-nums">{formatVisitTime(visit.startsAt, language)}</p>
-            <p className="mt-3 text-lg">{visit.project}</p>
-            <p className="mt-1">{visit.locationLabel}</p>
-            <div className="mt-1">
-              <MapLink url={visit.mapUrl} label={t.directions} />
-            </div>
-            <p className="mt-2 text-sm text-muted">
-              {t.rera}: {visit.reraNumber}
-            </p>
-            {state.executive && (
-              <p className="mt-4">
-                {state.executive} {t.contactTitle}
+            <section className="on-dark mt-6 rounded-3xl bg-neem-dark p-6 text-white shadow-soft">
+              <p className="flex items-start gap-3 font-serif text-3xl leading-tight">
+                <Icon name="calendar" className="mt-1 size-7" />
+                {formatVisitTime(visit.startsAt, language)}
               </p>
-            )}
+              <p className="mt-4 text-lg font-medium">{visit.project}</p>
+              <p className="mt-1">{visit.locationLabel}</p>
+              <p className="mt-1 text-sm text-white/90">
+                {t.rera}: {visit.reraNumber}
+              </p>
+              <div className="mt-2 [&_a]:text-white">
+                <MapLink url={visit.mapUrl} label={t.directions} />
+              </div>
+              {state.executive && (
+                <p className="mt-3 border-t border-white/25 pt-3">
+                  {state.executive} {t.contactTitle}
+                </p>
+              )}
+            </section>
 
             {isPast ? (
               <>
-                <p className="mt-8 rounded-md bg-amber-soft px-3 py-2 text-amber">{t.visitPastNote}</p>
-                <div className="mt-5">
+                <p className="mt-4 flex items-start gap-2 rounded-2xl bg-amber-soft px-4 py-3 text-amber">
+                  <Icon name="alert" />
+                  {t.visitPastNote}
+                </p>
+                <div className="mt-4">
                   <BookAgain language={language} project={visit.slug} showCodes={showCodes()} />
                 </div>
               </>
             ) : (
               <>
-                <section className="mt-8">
+                <section className={`mt-4 ${card}`}>
                   <h2 className="font-medium">{t.remindersTitle}</h2>
                   {state.reminders.length ? (
-                    <ul className="mt-1 text-muted">
-                      {state.reminders.includes("reminder_1d") && <li>{t.reminder1d}</li>}
-                      {state.reminders.includes("reminder_2h") && <li>{t.reminder2h}</li>}
+                    <ul className="mt-2 space-y-1 text-muted">
+                      {state.reminders.includes("reminder_1d") && (
+                        <li className="flex items-center gap-2">
+                          <Icon name="clock" />
+                          {t.reminder1d}
+                        </li>
+                      )}
+                      {state.reminders.includes("reminder_2h") && (
+                        <li className="flex items-center gap-2">
+                          <Icon name="clock" />
+                          {t.reminder2h}
+                        </li>
+                      )}
                     </ul>
                   ) : (
                     <p className="mt-1 text-muted">{t.noReminders}</p>
                   )}
                 </section>
-                <div className="mt-8">
+                <div className="mt-4">
                   <VisitActions language={language} project={visit.slug} showCodes={showCodes()} />
                 </div>
               </>
             )}
           </>
         ) : (
-          <>
-            <p className="mt-6 text-lg">{t.noVisit}</p>
-            <Link href="/chat" className={`mt-5 inline-block ${primaryButton}`}>
+          <div className={`mt-6 ${card}`}>
+            <p className="text-lg">{t.noVisit}</p>
+            <Link href="/chat" className={`mt-4 ${primaryButton}`}>
               {t.bookVisit}
             </Link>
             {!state?.hasContact && <PhoneSignIn language={language} showCodes={showCodes()} />}
-          </>
+          </div>
         )}
 
         {state?.hasContact &&
-          (state.optedOutAt ? (
-            <p className="mt-10 border-t border-line pt-6 text-muted">{t.optedOut}</p>
-          ) : (
-            <OptOut language={language} />
-          ))}
+          (state.optedOutAt ? <p className={`mt-4 text-muted ${card}`}>{t.optedOut}</p> : <OptOut language={language} />)}
       </main>
     </div>
   );

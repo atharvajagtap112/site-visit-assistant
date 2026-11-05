@@ -10,10 +10,10 @@ export default async function NotFound() {
   const language = user ? "en" : await getLanguage();
   const t = STRINGS[language];
   return (
-    <main lang={language} className="mx-auto max-w-md px-6 py-24">
+    <main lang={language} className="mx-auto mt-16 max-w-md rounded-3xl bg-white p-8 shadow-soft max-sm:mx-4">
       <h1 className="font-serif text-4xl">{t.notFoundTitle}</h1>
       <p className="mt-3 text-muted">{t.notFoundHelp}</p>
-      <Link href={user ? "/leads" : "/"} className={`mt-6 inline-block ${primaryButton}`}>
+      <Link href={user ? "/leads" : "/"} className={`mt-6 ${primaryButton}`}>
         {user ? "Back to leads" : t.goHome}
       </Link>
     </main>

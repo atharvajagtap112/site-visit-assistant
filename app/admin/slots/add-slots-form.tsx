@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { primaryButton, textInput } from "@/components/ui";
+import { card, primaryButton, sectionTitle, textInput } from "@/components/ui";
 import { addSlotsAction } from "../actions";
 
 export function AddSlotsForm({ projectId, projectName, date }: { projectId: number; projectName: string; date: string }) {
@@ -9,8 +9,8 @@ export function AddSlotsForm({ projectId, projectName, date }: { projectId: numb
   const errors = state?.errors ?? {};
   return (
     // React resets a form after its action, so the key remounts it with what was entered.
-    <form key={JSON.stringify(state)} action={action} noValidate className="mt-12 space-y-4 border-t border-line pt-6">
-      <h2 className="font-serif text-2xl">Add slots to {projectName}</h2>
+    <form key={JSON.stringify(state)} action={action} noValidate className={`mt-6 space-y-4 ${card}`}>
+      <h2 className={sectionTitle}>Add slots to {projectName}</h2>
       <input type="hidden" name="projectId" value={projectId} />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-medium">
@@ -30,7 +30,7 @@ export function AddSlotsForm({ projectId, projectName, date }: { projectId: numb
         </p>
       )}
       {state?.saved && (
-        <p role="status" className="rounded-md bg-neem-soft px-3 py-2 text-sm">
+        <p role="status" className="rounded-xl bg-neem-soft px-3 py-2 text-sm">
           {state.saved}
         </p>
       )}

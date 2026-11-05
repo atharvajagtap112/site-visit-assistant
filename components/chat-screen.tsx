@@ -5,16 +5,18 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ChatCard } from "@/lib/assistant";
 import { requestError, STRINGS, type Language } from "@/lib/i18n";
 import { BookingSheet, type Booked, type Slot } from "./booking-sheet";
+import { Icon } from "./icons";
 import { LanguagePicker } from "./language-picker";
 import { MapLink } from "./map-link";
-import { postJson, primaryButton, secondaryButton, textInput } from "./ui";
+import { postJson, primaryButton, rowInput, secondaryButton, surface } from "./ui";
 
 type Item =
   | { kind: "message"; id: string; role: "buyer" | "assistant"; text: string }
   | { kind: "card"; id: string; card: ChatCard };
 
-const headerAction = "flex min-h-11 items-center justify-center rounded-md border border-line bg-white px-2 text-center font-medium hover:border-neem";
-const suggestion = "min-h-11 rounded-full border border-line bg-white px-4 text-sm hover:border-neem";
+const headerAction = "flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-line-strong bg-white px-3 py-1 text-center font-medium hover:border-neem hover:bg-neem-soft";
+const suggestion = "min-h-11 rounded-full bg-white px-4 py-1.5 text-sm font-medium text-neem ring-1 ring-line-strong/50 hover:ring-neem";
+const assistantBubble = `w-fit max-w-[85%] ${surface} rounded-tl-md px-4 py-2.5 break-words whitespace-pre-wrap`;
 
 let nextId = 0;
 const newId = () => `local-${nextId++}`;
@@ -125,7 +127,7 @@ export function ChatScreen({
                   <button
                     type="button"
                     onClick={() => setSheet({ slot })}
-                    className="w-full rounded-md border border-line bg-white px-3 py-3 tabular-nums hover:border-neem"
+                    className="min-h-11 w-full rounded-full border border-line-strong bg-white px-4 py-2 tabular-nums hover:border-neem hover:bg-neem-soft"
                   >
                     {slot.label}
                   </button>
@@ -146,8 +148,8 @@ export function ChatScreen({
         );
       case "booked":
         return (
-          <div className="rounded-md border border-neem bg-neem-soft p-4">
-            <p className="font-serif text-xl">{t.visitBooked}</p>
+          <div className="rounded-2xl bg-neem-soft p-4 ring-1 ring-neem/30">
+            <p className="flex items-center gap-2 font-serif text-xl"><Icon name="check" />{t.visitBooked}</p>
             <p className="mt-1 tabular-nums">{card.label}</p>
             <p>{card.project}</p>
             <p className="mt-1 text-sm text-muted">
@@ -163,7 +165,7 @@ export function ChatScreen({
         );
       case "handoff":
         return (
-          <div className="rounded-md border border-line bg-white p-4">
+          <div className={`${surface} p-4`}>
             <p>{card.executive ? `${card.executive} ${t.connectingPerson}` : t.unassigned}</p>
             {hasContact ? (
               <p className="mt-1 text-sm text-muted">
@@ -191,13 +193,13 @@ export function ChatScreen({
 
   return (
     <div lang={language} className="flex h-dvh flex-col">
-      <header className="shrink-0 border-b border-line bg-paper px-4 py-3">
+      <header className="shrink-0 border-b border-line bg-white px-4 py-2.5">
         <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-x-4 gap-y-1">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link href="/" className="inline-flex min-h-11 items-center text-sm text-muted underline underline-offset-4">
-              {t.back}
+          <div className="flex min-w-0 items-center gap-1">
+            <Link href="/" aria-label={t.back} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-paper hover:text-ink">
+              <Icon name="chevronLeft" />
             </Link>
-            <h1 className="truncate font-serif text-xl">{project.name}</h1>
+            <h1 className="truncate font-serif text-2xl">{project.name}</h1>
           </div>
           <LanguagePicker current={language} />
         </div>
@@ -219,7 +221,7 @@ export function ChatScreen({
 
       <main className="flex-1 overflow-y-auto px-4 py-6">
         <div role="log" aria-live="polite" className="mx-auto max-w-2xl space-y-4">
-          <p className="max-w-[85%] text-lg">{t.greeting}</p>
+          <p className={assistantBubble}>{t.greeting}</p>
 
           {items.length === 0 && (
             <div className="flex flex-wrap gap-2">
@@ -249,11 +251,11 @@ export function ChatScreen({
                 {renderCard(item.card)}
               </div>
             ) : item.role === "buyer" ? (
-              <p key={item.id} className="ml-auto w-fit max-w-[85%] rounded-lg bg-neem-soft px-4 py-2.5 break-words whitespace-pre-wrap">
+              <p key={item.id} className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-tr-md bg-neem px-4 py-2.5 break-words whitespace-pre-wrap text-white">
                 {item.text}
               </p>
             ) : (
-              <p key={item.id} className="max-w-[85%] break-words whitespace-pre-wrap">
+              <p key={item.id} className={assistantBubble}>
                 {item.text}
               </p>
             ),
@@ -287,7 +289,7 @@ export function ChatScreen({
         </div>
       </main>
 
-      <form onSubmit={submit} className="shrink-0 border-t border-line bg-paper px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <form onSubmit={submit} className="shrink-0 border-t border-line bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto flex max-w-2xl gap-2">
           <label className="min-w-0 flex-1">
             <span className="sr-only">{t.messageLabel}</span>
@@ -297,11 +299,11 @@ export function ChatScreen({
               maxLength={800}
               placeholder={t.messagePlaceholder}
               autoComplete="off"
-              className={`${textInput} mt-0`}
+              className={`${rowInput} rounded-full px-5`}
             />
           </label>
-          <button type="submit" disabled={sending || !text.trim()} className={primaryButton}>
-            {t.send}
+          <button type="submit" disabled={sending || !text.trim()} aria-label={t.send} className="grid size-11 shrink-0 place-items-center rounded-full bg-neem text-white hover:bg-neem-dark disabled:opacity-60">
+            <Icon name="send" />
           </button>
         </div>
       </form>

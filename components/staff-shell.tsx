@@ -3,49 +3,54 @@ import type { ReactNode } from "react";
 import { signOut } from "@/app/sign-in/actions";
 import { unreviewedCount } from "@/lib/admin";
 import type { SessionUser } from "@/lib/auth";
-
-const navLink = "inline-flex min-h-11 items-center rounded px-1 font-medium underline-offset-4 hover:underline";
+import { Avatar, Logo } from "./bits";
+import { Icon } from "./icons";
+import { StaffNav } from "./staff-nav";
 
 export async function StaffShell({ user, children }: { user: SessionUser; children: ReactNode }) {
   const isHead = user.role === "sales_head";
   const toReview = isHead ? await unreviewedCount(user) : 0;
 
   return (
-    <div lang="en" className="mx-auto max-w-6xl px-5 pb-20 sm:px-8">
-      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-line py-4">
-        <Link href="/leads" className="inline-flex min-h-11 items-center font-serif text-xl">
-          Company A Homes
+    <div lang="en" className="min-h-dvh lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-line bg-white p-4 lg:flex">
+        <Link href="/leads" className="mb-6 px-1">
+          <Logo />
         </Link>
-        <div className="flex flex-wrap items-center gap-x-4">
-          <nav aria-label="Staff" className="flex flex-wrap items-center gap-x-4">
-            <Link href="/leads" className={navLink}>
-              Leads
-            </Link>
-            <Link href="/leads/new" className={navLink}>
-              Add lead
-            </Link>
-            {isHead && (
-              <>
-                <Link href="/dashboard" className={navLink}>
-                  Dashboard
-                </Link>
-                <Link
-                  href="/admin"
-                  className={navLink}
-                  aria-label={toReview ? `Admin, ${toReview} flagged ${toReview === 1 ? "chat" : "chats"} to review` : undefined}
-                >
-                  Admin{toReview > 0 && <span className="text-amber tabular-nums"> ({toReview})</span>}
-                </Link>
-              </>
-            )}
-          </nav>
-          <form action={signOut} className="flex items-center gap-4">
-            <span className="hidden text-muted md:inline">{user.name}</span>
-            <button className={navLink}>Sign out</button>
+        <StaffNav isHead={isHead} toReview={toReview} />
+        <div className="mt-auto rounded-2xl bg-paper p-3">
+          <div className="flex items-center gap-3">
+            <Avatar name={user.name} />
+            <div className="min-w-0">
+              <p className="truncate font-medium">{user.name}</p>
+              <p className="text-sm text-muted">{isHead ? "Sales head" : "Sales executive"}</p>
+            </div>
+          </div>
+          <form action={signOut} className="mt-2">
+            <button className="flex min-h-11 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-muted hover:text-ink">
+              <Icon name="signOut" />
+              Sign out
+            </button>
           </form>
         </div>
-      </header>
-      {children}
+      </aside>
+
+      <div className="min-w-0">
+        <header className="flex items-center justify-between gap-3 border-b border-line bg-white px-4 py-2 lg:hidden">
+          <Link href="/leads">
+            <Logo />
+          </Link>
+          <form action={signOut}>
+            <button className="flex min-h-11 items-center gap-1.5 rounded-full px-2 text-sm font-medium text-muted hover:text-ink">
+              <Icon name="signOut" />
+              Sign out
+            </button>
+          </form>
+        </header>
+        <div className="mx-auto max-w-6xl px-4 pb-24 sm:px-8 lg:pb-12">{children}</div>
+      </div>
+
+      <StaffNav isHead={isHead} toReview={toReview} tabs />
     </div>
   );
 }

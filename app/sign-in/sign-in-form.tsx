@@ -1,17 +1,15 @@
 "use client";
 
 import { useActionState } from "react";
+import { primaryButton, textInput } from "@/components/ui";
 import { signIn } from "./actions";
-
-const inputClass =
-  "mt-2 block w-full rounded-md border border-line bg-white px-3.5 py-3 text-base focus:border-neem";
 
 export function SignInForm() {
   const [state, action, pending] = useActionState(signIn, null);
 
   return (
-    <form action={action} className="mt-10 space-y-6">
-      <label className="block font-medium">
+    <form action={action} className="mt-8 space-y-5">
+      <label className="block text-sm font-medium">
         Email
         <input
           key={state?.email}
@@ -20,28 +18,19 @@ export function SignInForm() {
           autoComplete="email"
           defaultValue={state?.email}
           required
-          className={inputClass}
+          className={`${textInput} font-normal`}
         />
       </label>
-      <label className="block font-medium">
+      <label className="block text-sm font-medium">
         Password
-        <input
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          className={inputClass}
-        />
+        <input name="password" type="password" autoComplete="current-password" required className={`${textInput} font-normal`} />
       </label>
       {state && (
         <p role="alert" className="text-alert">
           {state.error}
         </p>
       )}
-      <button
-        disabled={pending}
-        className="w-full rounded-md bg-neem px-5 py-3.5 font-medium text-white hover:bg-neem-dark disabled:opacity-60"
-      >
+      <button disabled={pending} className={`w-full ${primaryButton}`}>
         {pending ? "Signing in" : "Sign in"}
       </button>
     </form>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { chip } from "@/components/ui";
 
 export function AdminTabs({ toReview }: { toReview: number }) {
   const pathname = usePathname();
@@ -11,14 +12,9 @@ export function AdminTabs({ toReview }: { toReview: number }) {
     { href: "/admin/slots", label: "Slots" },
   ];
   return (
-    <nav aria-label="Admin" className="mt-6 flex flex-wrap gap-x-5 gap-y-1">
+    <nav aria-label="Admin" className="mt-6 flex flex-wrap gap-2 border-b border-line pb-4">
       {tabs.map((tab) => (
-        <Link
-          key={tab.href}
-          href={tab.href}
-          aria-current={pathname === tab.href ? "page" : undefined}
-          className={`inline-flex min-h-11 items-center underline-offset-4 hover:underline ${pathname === tab.href ? "font-medium underline" : "text-muted"}`}
-        >
+        <Link key={tab.href} href={tab.href} aria-current={pathname === tab.href ? "page" : undefined} className={chip(pathname === tab.href)}>
           {tab.label}
         </Link>
       ))}

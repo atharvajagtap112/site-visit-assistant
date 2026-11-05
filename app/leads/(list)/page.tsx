@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { secondaryButton, textInput } from "@/components/ui";
+import { Avatar, Pill } from "@/components/bits";
+import { Icon } from "@/components/icons";
+import { card, chip, pageTitle, primaryButton, rowInput, secondaryButton, sectionTitle, surface, textInput } from "@/components/ui";
 import { leadSourceEnum, leadStatusEnum } from "@/db/schema";
 import { formatWait, SOURCE_LABELS, STATUS_LABELS, visitLabel } from "@/lib/format";
 import {
@@ -23,11 +25,16 @@ const leadLink = "font-medium underline-offset-4 hover:underline";
 
 function Visit({ lead }: { lead: LeadRow }) {
   const { text, needsAction } = visitLabel(lead.visit);
-  return needsAction ? (
-    <span className="rounded bg-amber-soft px-2 py-1 text-amber">{text}</span>
-  ) : (
-    <span>{text}</span>
-  );
+  const status = lead.visit?.status;
+  if (needsAction) return <Pill tone="amber" icon="alert">{text}</Pill>;
+  if (status === "visited") return <Pill tone="green" icon="check">{text}</Pill>;
+  if (status === "no_show") return <Pill tone="alert" icon="cross">{text}</Pill>;
+  if (status === "booked") return <Pill tone="green" icon="calendar">{text}</Pill>;
+  return <span className="text-sm text-muted">{text}</span>;
+}
+
+function Status({ lead }: { lead: LeadRow }) {
+  return <Pill tone={lead.status === "new" ? "green" : "neutral"}>{STATUS_LABELS[lead.status]}</Pill>;
 }
 
 function FirstResponse({ lead }: { lead: LeadRow }) {
@@ -48,7 +55,7 @@ function Warnings({ lead }: { lead: LeadRow }) {
         <span className="block text-amber">
           Same phone as{" "}
           {lead.duplicate.canOpen ? (
-            <Link href={`/leads/${lead.duplicate.id}`} className="underline underline-offset-4">
+            <Link href={`/leads/${lead.duplicate.id}`} className="relative z-10 underline underline-offset-4">
               LD-{lead.duplicate.id}
             </Link>
           ) : (
@@ -120,30 +127,60 @@ export default async function LeadsPage({
 
   return (
     <main>
-      <h1 className="mt-10 font-serif text-4xl">{isHead ? "All leads" : "Your leads"}</h1>
-      <p className="mt-2 text-muted tabular-nums">
-        {total === 0
-          ? "No leads to show"
-          : total <= PAGE_SIZE
-            ? `${total} ${total === 1 ? "lead" : "leads"}`
-            : `Showing ${first} to ${first + rows.length - 1} of ${total} leads, newest first`}
-      </p>
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className={pageTitle}>{isHead ? "All leads" : "Your leads"}</h1>
+          <p className="mt-1 text-muted tabular-nums">
+            {total === 0
+              ? "No leads to show"
+              : total <= PAGE_SIZE
+                ? `${total} ${total === 1 ? "lead" : "leads"}`
+                : `Showing ${first} to ${first + rows.length - 1} of ${total} leads, newest first`}
+          </p>
+        </div>
+        <Link href="/leads/new" className={primaryButton}>
+          <Icon name="plus" />
+          Add lead
+        </Link>
+      </div>
+
+      <nav aria-label="Quick filters" className="mt-5 flex flex-wrap gap-2">
+        <Link href={pageHref({ ...filters, status: undefined }, 1)} aria-current={!filters.status ? "page" : undefined} className={chip(!filters.status)}>
+          Any status
+        </Link>
+        {leadStatusEnum.enumValues.map((status) => (
+          <Link key={status} href={pageHref({ ...filters, status }, 1)} aria-current={filters.status === status ? "page" : undefined} className={chip(filters.status === status)}>
+            {STATUS_LABELS[status]}
+          </Link>
+        ))}
+        <Link
+          href={pageHref({ ...filters, visit: filters.visit === "needs_record" ? undefined : "needs_record" }, 1)}
+          aria-current={filters.visit === "needs_record" ? "page" : undefined}
+          className={chip(filters.visit === "needs_record")}
+        >
+          <Icon name="alert" className="size-4" />
+          {VISIT_STATES.needs_record}
+        </Link>
+      </nav>
 
       {/* The key resets the inputs when "Clear filters" changes the URL under them. */}
-      <Form key={JSON.stringify(active)} action="/leads" className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <label className="col-span-2 block text-sm font-medium md:col-span-3 lg:col-span-6">
+      <Form key={JSON.stringify(active)} action="/leads" className={`mt-4 grid grid-cols-2 items-end gap-3 md:grid-cols-4 ${card}`}>
+        {filters.status && <input type="hidden" name="status" value={filters.status} />}
+        <label className="col-span-2 block text-sm font-medium md:col-span-4">
           Search by name, phone or lead ID
-          <input type="search" name="q" defaultValue={filters.q} maxLength={100} className={`${textInput} font-normal`} />
+          <span className="relative mt-1 block">
+            <Icon name="search" className="absolute top-3 left-3.5 size-5 text-muted" />
+            <input type="search" name="q" defaultValue={filters.q} maxLength={100} className={`${rowInput} pl-10 font-normal`} />
+          </span>
         </label>
         <Select name="source" label="Source" value={filters.source} options={leadSourceEnum.enumValues.map((v) => ({ value: v, label: SOURCE_LABELS[v] }))} />
         <Select name="project" label="Project" value={filters.project} options={projects.map((p) => ({ value: p.id, label: p.name }))} />
-        <Select name="status" label="Status" value={filters.status} options={leadStatusEnum.enumValues.map((v) => ({ value: v, label: STATUS_LABELS[v] }))} />
         <Select name="visit" label="Visit" value={filters.visit} options={Object.entries(VISIT_STATES).map(([value, label]) => ({ value, label }))} />
         {isHead && <Select name="executive" label="Executive" value={filters.executive} options={executives.map((e) => ({ value: e.id, label: e.name }))} />}
-        <div className="col-span-2 flex items-end gap-2 md:col-span-1">
-          <button className={`flex-1 ${secondaryButton}`}>Apply</button>
+        <div className="col-span-2 flex items-center gap-2 md:col-span-4">
+          <button className={secondaryButton}>Apply</button>
           {filtering && (
-            <Link href="/leads" className="px-2 py-3 whitespace-nowrap underline underline-offset-4">
+            <Link href="/leads" className="inline-flex min-h-11 items-center px-2 whitespace-nowrap underline underline-offset-4">
               Clear
             </Link>
           )}
@@ -152,15 +189,15 @@ export default async function LeadsPage({
 
       {rows.length === 0 ? (
         filtering ? (
-          <div className="mt-12 max-w-md">
-            <p className="font-serif text-2xl">No leads match these filters</p>
+          <div className={`mt-6 max-w-md ${card}`}>
+            <p className={sectionTitle}>No leads match these filters</p>
             <p className="mt-2 text-muted">Try a shorter search or fewer filters.</p>
-            <Link href="/leads" className={`mt-5 inline-block ${secondaryButton}`}>
+            <Link href="/leads" className={`mt-5 ${secondaryButton}`}>
               Clear filters
             </Link>
           </div>
         ) : (
-          <p className="mt-12 max-w-md text-muted">
+          <p className={`mt-6 max-w-md text-muted ${card}`}>
             {isHead ? "There are no leads yet." : "No leads are assigned to you yet."} New enquiries appear here as soon as they
             arrive, or you can{" "}
             <Link href="/leads/new" className="underline underline-offset-4">
@@ -171,71 +208,86 @@ export default async function LeadsPage({
         )
       ) : (
         <>
-          <ul className="mt-8 divide-y divide-line border-y border-line md:hidden">
+          <ul className="mt-6 space-y-3 md:hidden">
             {rows.map((lead) => (
-              <li key={lead.id} className="py-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <Link href={`/leads/${lead.id}`} className={`inline-flex min-h-11 items-center underline ${leadLink}`}>
-                    {lead.name ?? "Name not given"}
-                  </Link>
-                  <p className="text-sm text-muted tabular-nums">LD-{lead.id}</p>
+              <li key={lead.id} className={`relative ${card}`}>
+                <div className="flex items-center gap-3">
+                  <Avatar name={lead.name} />
+                  <div className="min-w-0 flex-1">
+                    {/* The link's overlay makes the whole card a tap target. */}
+                    <Link href={`/leads/${lead.id}`} className={`after:absolute after:inset-0 after:rounded-2xl ${leadLink}`}>
+                      {lead.name ?? "Name not given"}
+                    </Link>
+                    <p className="text-sm text-muted tabular-nums">LD-{lead.id}</p>
+                  </div>
+                  <Status lead={lead} />
                 </div>
                 <Warnings lead={lead} />
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-3 text-sm text-muted">
                   {SOURCE_LABELS[lead.source]}, {describe(lead)}
                 </p>
-                <p className="mt-2 text-sm">
+                <p className="mt-2">
                   <Visit lead={lead} />
                 </p>
                 <p className="mt-2 text-sm text-muted">
-                  {STATUS_LABELS[lead.status]}. First reply: <FirstResponse lead={lead} />
+                  First reply: <FirstResponse lead={lead} />
                 </p>
                 {isHead && <p className="mt-1 text-sm text-muted">Assigned to {lead.assignedTo ?? "nobody yet"}</p>}
               </li>
             ))}
           </ul>
 
-          <table className="mt-8 hidden w-full border-collapse text-left text-[15px] md:table">
-            <thead>
-              <tr className="border-b border-ink text-sm text-muted">
-                <th className="py-3 pr-4 font-medium">Lead</th>
-                <th className="py-3 pr-4 font-medium">Source</th>
-                <th className="py-3 pr-4 font-medium">Interested in</th>
-                <th className="py-3 pr-4 font-medium">Status</th>
-                <th className="py-3 pr-4 font-medium">Visit</th>
-                {isHead && <th className="py-3 pr-4 font-medium">Assigned to</th>}
-                <th className="py-3 text-right font-medium">First reply</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {rows.map((lead) => (
-                <tr key={lead.id} className="align-top">
-                  <td className="py-3.5 pr-4">
-                    <Link href={`/leads/${lead.id}`} className={`block ${leadLink}`}>
-                      {lead.name ?? "Name not given"}
-                    </Link>
-                    <span className="text-sm text-muted tabular-nums">LD-{lead.id}</span>
-                    <Warnings lead={lead} />
-                  </td>
-                  <td className="py-3.5 pr-4">{SOURCE_LABELS[lead.source]}</td>
-                  <td className="py-3.5 pr-4">{describe(lead)}</td>
-                  <td className="py-3.5 pr-4">{STATUS_LABELS[lead.status]}</td>
-                  <td className="py-3.5 pr-4 tabular-nums">
-                    <Visit lead={lead} />
-                  </td>
-                  {isHead && <td className="py-3.5 pr-4">{lead.assignedTo ?? "Unassigned"}</td>}
-                  <td className="py-3.5 text-right tabular-nums">
-                    <FirstResponse lead={lead} />
-                  </td>
+          <div className={`mt-6 hidden overflow-x-auto md:block ${surface}`}>
+            <table className="w-full border-collapse text-left text-[15px]">
+              <thead>
+                <tr className="border-b border-line text-sm text-muted">
+                  <th className="px-5 py-3 font-medium">Lead</th>
+                  <th className="py-3 pr-4 font-medium">Source</th>
+                  <th className="py-3 pr-4 font-medium">Interested in</th>
+                  <th className="py-3 pr-4 font-medium">Status</th>
+                  <th className="py-3 pr-4 font-medium">Visit</th>
+                  {isHead && <th className="py-3 pr-4 font-medium">Assigned to</th>}
+                  <th className="py-3 pr-5 text-right font-medium">First reply</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {rows.map((lead) => (
+                  <tr key={lead.id} className="align-top hover:bg-paper/60">
+                    <td className="px-5 py-3.5">
+                      <div className="flex gap-3">
+                        <Avatar name={lead.name} />
+                        <div className="min-w-0">
+                          <Link href={`/leads/${lead.id}`} className={`block ${leadLink}`}>
+                            {lead.name ?? "Name not given"}
+                          </Link>
+                          <span className="text-sm text-muted tabular-nums">LD-{lead.id}</span>
+                          <Warnings lead={lead} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 pr-4">{SOURCE_LABELS[lead.source]}</td>
+                    <td className="py-3.5 pr-4">{describe(lead)}</td>
+                    <td className="py-3.5 pr-4">
+                      <Status lead={lead} />
+                    </td>
+                    <td className="py-3.5 pr-4 tabular-nums">
+                      <Visit lead={lead} />
+                    </td>
+                    {isHead && <td className="py-3.5 pr-4">{lead.assignedTo ?? "Unassigned"}</td>}
+                    <td className="py-3.5 pr-5 text-right tabular-nums">
+                      <FirstResponse lead={lead} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {pageCount > 1 && (
             <nav aria-label="Pages" className="mt-6 flex items-center justify-between gap-4">
               {page > 1 ? (
                 <Link href={pageHref(filters, page - 1)} className={secondaryButton}>
+                  <Icon name="chevronLeft" className="size-4" />
                   Newer
                 </Link>
               ) : (
@@ -247,6 +299,7 @@ export default async function LeadsPage({
               {page < pageCount ? (
                 <Link href={pageHref(filters, page + 1)} className={secondaryButton}>
                   Older
+                  <Icon name="chevronRight" className="size-4" />
                 </Link>
               ) : (
                 <span />

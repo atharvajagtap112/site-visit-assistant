@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { requestError, type Language, type Strings } from "@/lib/i18n";
+import { Icon } from "./icons";
 import { MapLink } from "./map-link";
 import { postJson, primaryButton, secondaryButton, textInput } from "./ui";
 
@@ -200,7 +201,7 @@ export function BookingSheet({
       {t.talkToPerson}
     </button>
   ) : (
-    <Link href="/chat" className={`mt-4 block ${secondaryButton}`}>
+    <Link href="/chat" className={`mt-4 w-full ${secondaryButton}`}>
       {t.talkToPerson}
     </Link>
   );
@@ -214,20 +215,20 @@ export function BookingSheet({
       onClose={onClose}
       lang={language}
       aria-labelledby="sheet-title"
-      className="m-auto w-full max-w-md rounded-lg bg-paper p-0 text-ink max-sm:mb-0 max-sm:max-w-full max-sm:rounded-b-none"
+      className="m-auto w-full max-w-md rounded-3xl bg-white p-0 text-ink max-sm:mb-0 max-sm:max-w-full max-sm:rounded-b-none"
     >
       <div className="flex max-h-[85dvh] flex-col">
-        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4">
+        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3">
           <h2 id="sheet-title" ref={heading} tabIndex={-1} className="font-serif text-2xl outline-none">
             {title}
           </h2>
-          <button type="button" onClick={onClose} className="min-h-11 rounded px-2 text-sm text-muted underline underline-offset-4">
+          <button type="button" onClick={onClose} className="min-h-11 shrink-0 rounded-full px-3 text-sm font-medium text-muted underline underline-offset-4 hover:bg-paper">
             {t.close}
           </button>
         </div>
 
         <div className="overflow-y-auto px-5 py-5">
-          {note && <p className="mb-4 rounded-md bg-amber-soft px-3 py-2 text-sm text-amber">{note}</p>}
+          {note && <p className="mb-4 rounded-xl bg-amber-soft px-3 py-2 text-sm text-amber">{note}</p>}
           {error && (
             <p role="alert" className="mb-4 text-sm text-alert">
               {error}{" "}
@@ -266,7 +267,7 @@ export function BookingSheet({
                       <button
                         type="button"
                         onClick={() => chooseSlot(s)}
-                        className="w-full rounded-md border border-line bg-white px-2 py-3 text-sm tabular-nums hover:border-neem"
+                        className="min-h-11 w-full rounded-full border border-line-strong bg-white px-2 py-2 text-sm font-medium tabular-nums hover:border-neem hover:bg-neem-soft"
                       >
                         {s.label}
                       </button>
@@ -279,14 +280,14 @@ export function BookingSheet({
 
           {step === "details" && !showCodes && (
             <div>
-              <p className="rounded-md bg-amber-soft px-3 py-2 text-sm text-amber">{t.codesUnavailable}</p>
+              <p className="rounded-xl bg-amber-soft px-3 py-2 text-sm text-amber">{t.codesUnavailable}</p>
               {talkButton}
             </div>
           )}
 
           {step === "details" && showCodes && (
             <form onSubmit={demoCode ? confirmDetails : sendCode} className="space-y-4" noValidate>
-              {slot && <p className="tabular-nums">{slot.label}</p>}
+              {slot && <p className="rounded-xl bg-neem-soft px-3 py-2 font-medium tabular-nums">{slot.label}</p>}
               <label className="block text-sm font-medium">
                 {t.name}
                 <input
@@ -329,7 +330,7 @@ export function BookingSheet({
               {!demoCode && <p className="text-sm text-muted">{t.demoCodeNote}</p>}
               {demoCode && (
                 <>
-                  <p className="rounded-md bg-neem-soft px-3 py-2 text-sm">
+                  <p className="rounded-xl bg-neem-soft px-3 py-2 text-sm">
                     {t.demoCode} <strong className="tabular-nums">{demoCode}</strong>
                   </p>
                   <label className="block text-sm font-medium">
@@ -368,7 +369,7 @@ export function BookingSheet({
 
           {step === "confirm" && slot && (
             <div>
-              <p className="text-lg tabular-nums">{slot.label}</p>
+              <p className="flex items-center gap-3 rounded-2xl bg-neem-soft p-4 text-lg font-medium tabular-nums"><Icon name="calendar" />{slot.label}</p>
               <button
                 type="button"
                 disabled={busy}
@@ -393,7 +394,7 @@ export function BookingSheet({
 
           {step === "done" && booked && (
             <div className="space-y-2">
-              <p className="text-lg tabular-nums">{booked.label}</p>
+              <p className="flex items-center gap-3 rounded-2xl bg-neem-soft p-4 text-lg font-medium tabular-nums"><Icon name="check" />{booked.label}</p>
               <p>{booked.project}</p>
               <p className="text-sm text-muted">
                 {t.rera}: {booked.reraNumber}
@@ -404,7 +405,7 @@ export function BookingSheet({
                 </p>
               )}
               <MapLink url={booked.mapUrl} label={t.directions} />
-              <Link href="/visit" className={`mt-3 block ${primaryButton}`}>
+              <Link href="/visit" className={`mt-3 w-full ${primaryButton}`}>
                 {t.viewVisit}
               </Link>
             </div>

@@ -32,7 +32,7 @@ export function PhoneSignIn({ language, showCodes }: { language: Language; showC
     setError(requestError(t, data, t.actionFailed));
   }
 
-  if (!showCodes) return <p className="mt-6 max-w-sm rounded-md bg-amber-soft px-3 py-2 text-sm text-amber">{t.codesUnavailable}</p>;
+  if (!showCodes) return <p className="mt-6 max-w-sm rounded-xl bg-amber-soft px-3 py-2 text-sm text-amber">{t.codesUnavailable}</p>;
 
   return (
     <form onSubmit={submit} className="mt-6 max-w-sm space-y-4" noValidate>
@@ -53,7 +53,7 @@ export function PhoneSignIn({ language, showCodes }: { language: Language; showC
       {!demoCode && <p className="text-sm text-muted">{t.demoCodeNote}</p>}
       {demoCode && (
         <>
-          <p className="rounded-md bg-neem-soft px-3 py-2 text-sm">
+          <p className="rounded-xl bg-neem-soft px-3 py-2 text-sm">
             {t.demoCode} <strong className="tabular-nums">{demoCode}</strong>
           </p>
           <label className="block text-sm font-medium">

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Elevation, Tower } from "@/components/elevation";
+import { Logo } from "@/components/bits";
+import { SamplePhoto } from "@/components/sample-photo";
+import { STRINGS } from "@/lib/i18n";
 import { getCurrentUser } from "@/lib/session";
 import { SignInForm } from "./sign-in-form";
 
@@ -10,20 +12,17 @@ export default async function SignInPage() {
   if (await getCurrentUser()) redirect("/leads");
 
   return (
-    <div lang="en" className="grid min-h-dvh md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-      <main className="flex flex-col justify-center px-6 py-14 sm:px-16">
+    <div lang="en" className="grid min-h-dvh gap-4 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      <main className="flex flex-col justify-center rounded-3xl bg-white px-6 py-10 shadow-soft sm:px-14">
         <div className="mx-auto w-full max-w-sm">
-          <p className="font-serif text-xl">Company A Homes</p>
-          <h1 className="mt-10 font-serif text-4xl">Sign in</h1>
-          <p className="mt-3 text-muted">For the sales team. See your leads and site visits.</p>
+          <Logo />
+          <h1 className="mt-8 text-3xl font-semibold tracking-tight">Sign in</h1>
+          <p className="mt-2 text-muted">For the sales team. See your leads and site visits.</p>
           <SignInForm />
         </div>
       </main>
-      <div className="relative order-first h-32 overflow-hidden bg-neem md:order-0 md:h-auto">
-        <Elevation>
-          <Tower x={70} floors={17} cols={6} lit={[6, 3]} />
-          <Tower x={330} floors={12} cols={6} />
-        </Elevation>
+      <div className="relative hidden overflow-hidden rounded-3xl bg-line md:block">
+        <SamplePhoto index={1} alt={STRINGS.en.illustration} caption={STRINGS.en.samplePhoto} />
       </div>
     </div>
   );
