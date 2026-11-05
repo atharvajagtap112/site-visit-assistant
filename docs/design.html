@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Site visit assistant: technical design document</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body { font: 10.5pt/1.5 "Segoe UI", Arial, sans-serif; color: #16201b; }
+  h1 { font: 400 24pt Georgia, serif; margin: 0 0 6pt; color: #143226; }
+  h2 { font: 400 15pt Georgia, serif; color: #143226; margin: 20pt 0 6pt; border-bottom: 1px solid #dfe3de; padding-bottom: 3pt; break-after: avoid; }
+  h3 { font-size: 10.5pt; margin: 11pt 0 3pt; break-after: avoid; }
+  p, ul, ol { margin: 0 0 7pt; }
+  ul, ol { padding-left: 16pt; }
+  li { margin-bottom: 3pt; }
+  a { color: #1e4a38; }
+  table { border-collapse: collapse; width: 100%; margin: 4pt 0 9pt; font-size: 9.5pt; }
+  th, td { text-align: left; vertical-align: top; padding: 3.5pt 6pt; border-bottom: 1px solid #dfe3de; }
+  th { background: #e7f0ea; font-weight: 600; }
+  tr { break-inside: avoid; }
+  code { font: 9pt Consolas, monospace; }
+  .links { background: #e7f0ea; padding: 8pt 10pt; border-radius: 4pt; margin-bottom: 10pt; }
+  .tag { font-weight: 600; color: #85560a; white-space: nowrap; }
+  figure { margin: 6pt 0 10pt; break-inside: avoid; }
+  figcaption { font-size: 8.5pt; color: #55615a; margin-top: 3pt; }
+  .row { display: flex; gap: 6pt; }
+  .row img { width: 24%; border: 1px solid #dfe3de; }
+  img.wide { width: 100%; border: 1px solid #dfe3de; }
+</style>
+</head>
+<body>
+
+<div class="links">
+  <strong>GitHub:</strong> <a href="https://github.com/atharvajagtap112/site-visit-assistant">https://github.com/atharvajagtap112/site-visit-assistant</a><br>
+  <strong>Live link:</strong> <a href="https://site-visit-assistant-tau.vercel.app/">https://site-visit-assistant-tau.vercel.app/</a><br>
+  <strong>Demo login:</strong> <code>head@companya.example</code>, password <code>demo-sitevisit-2026</code>
+</div>
+
+<h1>Site visit assistant</h1>
+<p>Technical design document for brief 2: the AI lead-response and site-visit booking assistant for Company A, Ahmedabad.</p>
+
+<p>Anything the brief did not state is marked <span class="tag">[A1]</span> and so on, and listed in section 8. AI assistance was used throughout, as the brief allows.</p>
+
+<h2>1. The problem and what was built</h2>
+<p>Company A pays ₹1,000 for each of 3,000 leads a month. Its 11 sales staff leave 35% of them unreached after 48 hours, and 6% end in a visit. The targets are a median first response under 5 minutes, under 5% unreached at 48 hours, and 8% lead-to-visit.</p>
+<p>The app has two sides. A buyer chats in English, Hindi or Gujarati, gets answers from the sales head's fact sheet, books a real free slot and can reach a person at any time. Sales staff get a lead list with a duplicate check, handoffs with a chat summary, and show-up recording. The sales head also gets a source dashboard, flagged chats to review, and editors for the fact sheet and visit times.</p>
+
+<h2>2. Architecture and why</h2>
+<figure>
+<svg viewBox="0 0 720 150" width="100%" font-family="Segoe UI, Arial" font-size="12" role="img" aria-label="Browser to Next.js on Vercel in Singapore, which talks to Postgres on Neon in Singapore and to Groq and Gemini">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8z" fill="#55615a"/></marker></defs>
+  <g fill="#fff" stroke="#55615a"><rect x="5" y="45" width="130" height="60" rx="6"/><rect x="215" y="20" width="250" height="110" rx="6" fill="#e7f0ea"/><rect x="560" y="10" width="155" height="55" rx="6"/><rect x="560" y="85" width="155" height="55" rx="6"/></g>
+  <g fill="#16201b" text-anchor="middle">
+    <text x="70" y="72">Buyer or staff</text><text x="70" y="90">browser</text>
+    <text x="340" y="44" font-weight="600">Next.js on Vercel (Singapore)</text>
+    <text x="340" y="66">Pages, server actions, API routes</text><text x="340" y="84">Assistant loop and reply check</text><text x="340" y="102">Booking, leads, limits in lib/</text>
+    <text x="637" y="33">Postgres on Neon</text><text x="637" y="50">(Singapore)</text>
+    <text x="637" y="108">Groq, then Gemini</text><text x="637" y="125">(free model chain)</text>
+  </g>
+  <g stroke="#55615a" marker-end="url(#a)"><line x1="135" y1="75" x2="213" y2="75"/><line x1="465" y1="55" x2="558" y2="40"/><line x1="465" y1="95" x2="558" y2="112"/></g>
+</svg>
+</figure>
+<table>
+<tr><th>Choice</th><th>Why</th></tr>
+<tr><td>One Next.js app</td><td>One person and seven days. Screens and logic deploy together, with no separate API service to run.</td></tr>
+<tr><td>Postgres, with rules in the database</td><td>The hard requirement is no double booking under concurrent requests. Partial unique indexes guarantee that in a way application code cannot.</td></tr>
+<tr><td>Own tool loop, no agent framework</td><td>About the size of a small file, and every step that can affect a booking is visible and testable.</td></tr>
+<tr><td>Free model chain</td><td>The project must be free to run. A chain also means one model's limit or outage does not stop the chat.</td></tr>
+<tr><td>App and database both in Singapore</td><td>The app first deployed to the US by default, which put every query across the world. Singapore is Neon's closest region to Ahmedabad.</td></tr>
+</table>
+
+<h2>3. Data model</h2>
+<table>
+<tr><th>Table</th><th>Holds</th><th>Important rules</th></tr>
+<tr><td><code>users</code>, <code>sessions</code></td><td>Staff with a role (executive or sales head)</td><td>Passwords and session tokens stored only as hashes</td></tr>
+<tr><td><code>projects</code>, <code>facts</code></td><td>Projects with RERA number; the fact sheet</td><td>A fact with no project applies to both</td></tr>
+<tr><td><code>leads</code></td><td>Name, phone, source, needs, status, owner, consent and opt-out times</td><td><code>duplicate_of_id</code> links repeats; public ID is <code>LD-</code> plus the id</td></tr>
+<tr><td><code>slots</code>, <code>visits</code></td><td>Visit times; bookings and their outcome</td><td>Unique indexes: one booked visit per slot and per lead</td></tr>
+<tr><td><code>conversations</code>, <code>chat_messages</code></td><td>Chats, handoff summary, flags; messages and withheld drafts</td><td>Cookie token stored as a hash; drafts are staff-only</td></tr>
+<tr><td><code>otp_codes</code></td><td>Buyer sign-in codes</td><td>Hashed, with attempts and an expiry</td></tr>
+<tr><td><code>messages</code></td><td>Simulated outbox: confirmation and two reminders</td><td>Recorded and shown to staff, never sent</td></tr>
+<tr><td><code>rate_limits</code></td><td>Counters</td><td>Keys are hashed, so no phone or IP is stored</td></tr>
+</table>
+
+<h2>4. Main flows</h2>
+<h3>Buyer asks and books</h3>
+<ol>
+<li>A browser gets a random token when a buyer page loads. Parallel first requests therefore share one lead, instead of each making their own.</li>
+<li>The buyer asks a question. The assistant answers from the fact sheet and can offer free times.</li>
+<li>The buyer picks a time and gives a name, number and consent, then enters a code. The number is checked against existing leads, so a returning buyer stays with their executive.</li>
+<li>The booking runs in one transaction. It locks on the phone number, checks consent and opt-out, and inserts the visit. If someone else took the slot, the buyer sees that and picks another.</li>
+<li>Confirmation and the reminders at 1 day and 2 hours before are recorded. My visit lets the buyer change, cancel or stop messages.</li>
+</ol>
+<h3>Handoff</h3>
+<p>A buyer can ask for a person at any time, and the assistant hands off when it cannot answer. The lead goes to a named executive, whose lead page shows a summary of the chat.</p>
+<h3>Sales team</h3>
+<p>Executives see only their own leads; the sales head sees all. Adding a lead warns about a matching phone number and can save it as a linked duplicate that stays with the same executive. After a visit's time passes, staff record Visited or No-show, and can correct it. Staff can also record a phone opt-out.</p>
+<h3>Sales head</h3>
+<p>The dashboard shows the three targets, then leads, bookings, attended visits, response time, unreached share, show-up rate and cost per attended visit by source. The sales head reviews flagged chats daily and edits facts and visit times. Changes to facts reach the assistant on the next message.</p>
+<figure>
+  <div class="row">
+    <img src="images/buyer-chat-phone.jpg" alt="Chat answer"><img src="images/buyer-chat-discount-phone.jpg" alt="Discount question handed to a person"><img src="images/buyer-times-phone.jpg" alt="Free times"><img src="images/buyer-visit-phone.jpg" alt="My visit">
+  </div>
+  <figcaption>Live site at phone size: an answer from the fact sheet, a discount question handed to a named person, free times, and My visit.</figcaption>
+</figure>
+
+<h2>5. How the AI works</h2>
+<h3>Normal path</h3>
+<p>Each message runs a small tool loop. The model sees the fact sheet, the conversation and four tools: <code>get_free_slots</code>, <code>book_visit</code>, <code>save_buyer_needs</code> and <code>handoff_to_human</code>. Slot cards and handoff cards are drawn from the database, not from the model's text. Names and phone numbers are never sent to the model, and any number typed into the chat is removed first.</p>
+<p>The chain is <code>openai/gpt-oss-120b</code>, then <code>qwen/qwen3.8-27b</code> on Groq, then <code>gemini-3.1-flash-lite</code>. Each call has 12 seconds, over two passes.</p>
+<h3>When it is wrong or unsure</h3>
+<table>
+<tr><th>Situation</th><th>What happens</th></tr>
+<tr><td>Fact not on the sheet</td><td>The instructions tell it to say a person will confirm and to hand off</td></tr>
+<tr><td>Reply has a number no tool or fact gave, or a price, discount or offer claim</td><td>The check in code withholds it. The buyer gets a safe reply and a named person. The chat is flagged, and the sales head sees the draft</td></tr>
+<tr><td>Reply leaks raw JSON, tool names or slot IDs</td><td>Withheld the same way</td></tr>
+<tr><td>Promises that a person will follow up</td><td>The check spots the promise and makes a real handoff, so it is kept</td></tr>
+<tr><td>Says a visit is booked</td><td>A booking only counts when the confirmation card appears, and that card comes from the database. The check has no specific rule for this wording, so the card is the proof, not the text</td></tr>
+<tr><td>All models down or rate limited</td><td>A fixed reply in the buyer's language, plus the booking and person buttons, which never need the AI</td></tr>
+</table>
+<p>The check fails safe: when in doubt, it withholds. That means an occasional correct reply is withheld, which costs a handoff but never misleads a buyer.</p>
+<h3>Measured results</h3>
+<p>A script (<code>scripts/eval-chat.ts</code>) runs scripted conversations against the real models.</p>
+<table>
+<tr><th>Run</th><th>Result</th></tr>
+<tr><td>Three models compared, 15 conversations each</td><td><code>gpt-oss-120b</code> 15 passed; <code>qwen3.8-27b</code> 13 passed, both failures in booking; a smaller model 12 passed, with raw JSON and wrong language, so it was dropped</td></tr>
+<tr><td>Default chain after hardening, two runs of 15</td><td>All passed, median reply 1.7 seconds, one correct reply withheld in each run</td></tr>
+<tr><td>Hindi and Gujarati conversations</td><td>8 of 8 passed</td></tr>
+<tr><td>Forcing a switch to the backup</td><td>The main model 4 of 4; Qwen 3 of 4, and it failed "picks a time" twice overall, so it cannot be trusted to book by chat. The booking button still works</td></tr>
+</table>
+<p>Gemini never answered in any test, because the available key returns a 403 billing error. It is in the chain but unproven, and the app works without it.</p>
+
+<h2>6. UI and design decisions</h2>
+<ul>
+<li><strong>Calm and premium, as briefed.</strong> One deep green, a pale tinted background and generous space. Amber and red appear only when they mean something.</li>
+<li><strong>Phone first for buyers.</strong> Booking is a bottom sheet with large time buttons, and the chat keeps "Talk to a person" and "Book a visit" always in view.</li>
+<li><strong>The sales team's screens favour scanning.</strong> Status pills use words and icons, not just colour. The lead list becomes cards on a phone, and the sidebar becomes bottom tabs.</li>
+<li><strong>Only real controls and real figures.</strong> There are no notification bells, "..." menus or trend lines, because nothing stands behind them yet.</li>
+<li><strong>Photos are labelled.</strong> Each sample photo says it is not the project, because RERA rules out claims beyond registered details.</li>
+<li><strong>Plain language.</strong> Errors say what happened and how to fix it. Buyer screens, dates, lakh and crore are translated. Project data such as the address stays in English.</li>
+</ul>
+<figure>
+  <img class="wide" src="images/dashboard-desk.jpg" alt="Source dashboard on the live site">
+  <figcaption>Source dashboard. Figures come from made-up sample leads, so they show that the screen works, not that the targets are being met.</figcaption>
+</figure>
+
+<h2>7. Quality and security</h2>
+<ul>
+<li><strong>Tests:</strong> 495 automated tests, against a real Postgres database, including parallel bookings and parallel request bursts.</li>
+<li><strong>Forged requests:</strong> <code>scripts/forged-requests.ts</code> makes 152 checks against a running production build: bad JSON, wrong types, oversized bodies, missing cookies, and forged server actions as an executive on another's lead. The database was unchanged afterwards.</li>
+<li><strong>Access control:</strong> the role check runs on the server in each action and query. On the live site, Riya sees 42 of 117 leads and gets a 404 on admin and dashboard.</li>
+<li><strong>Rate limits, stored in Postgres:</strong> sign-in, code sending, code checks, chat and handoff. On the live site, faking a different IP on each request did not get past the limit.</li>
+<li><strong>Secrets:</strong> environment variable names only in the repository, and the full history was scanned before it went public.</li>
+<li><strong>Compliance:</strong> consent is required to book, opt-outs cover every lead with that phone, and the RERA number shows with project details.</li>
+</ul>
+<h3>Checked on the live site</h3>
+<p>Buyer question, discount handoff and booking through to My visit; staff sign-in, show-up recording, dashboard, admin screens; times and chat in Hindi and Gujarati at phone size. No page errors were logged.</p>
+<h3>Known limits</h3>
+<ul>
+<li><strong>On-screen codes.</strong> With <code>DEMO_SHOW_CODES=yes</code>, anyone can sign in as any phone number and see that lead's visit. This is acceptable only because the data is made up. A real SMS provider must replace it before real use.</li>
+<li><strong>Reminders are recorded, not sent.</strong> The brief asked for mock messages, so no scheduler delivers them.</li>
+<li><strong>Free tier capacity.</strong> Groq's limit is about 5 chat messages a minute per model. That suits a demo, not 3,000 leads a month, which would need a paid tier.</li>
+<li><strong>Not tested:</strong> real phones and screen readers. A native speaker has not checked the Hindi and Gujarati.</li>
+<li><strong>Tested before the final redesign and not repeated after it:</strong> forced database failure and recovery. Keyboard focus and tap sizes were audited before it, but only spot-checked after.</li>
+<li><strong>With codes switched off,</strong> "Talk to a person" still hands off, but the buyer cannot leave a number. This does not affect the demo.</li>
+<li><strong>A person can be locked out on purpose.</strong> Someone repeatedly trying an account or phone can lock it for up to 15 minutes. That is the cost of per-account limits.</li>
+</ul>
+
+<h2>8. Assumptions</h2>
+<p>Everything here is my own decision or placeholder, not from the brief.</p>
+<table>
+<tr><th>#</th><th>Assumption</th></tr>
+<tr><td>A1</td><td>RERA numbers, addresses and map pins are placeholders, since the brief gives none.</td></tr>
+<tr><td>A2</td><td>Parking, amenities and visit hours on the fact sheet are invented sample facts, for the sales head to replace.</td></tr>
+<tr><td>A3</td><td>₹1,000 per lead applies to every source. The dashboard says real spend per source is not recorded.</td></tr>
+<tr><td>A4</td><td>The same phone is one person, costed once under their first source. Repeats are shown separately.</td></tr>
+<tr><td>A5</td><td>"Not reached" means no reply by 48 hours, or a reply after that. A lead under 48 hours old with no reply is left out until it counts either way.</td></tr>
+<tr><td>A6</td><td>Lead-to-visit is attended visits divided by people. Show-up rate is visited divided by visited plus no-show, leaving out cancelled visits.</td></tr>
+<tr><td>A7</td><td>If a visit's time has passed with no outcome recorded, rebooking marks it as a no-show. Staff can correct it.</td></tr>
+<tr><td>A8</td><td>Consent is optional when staff add a lead, with a "Record consent" action later, but booking needs it.</td></tr>
+<tr><td>A9</td><td>Staff cannot lift an opt-out; only the buyer's own consent does. Duplicates inherit an opt-out, and a recorded opt-out covers every lead with that phone.</td></tr>
+<tr><td>A10</td><td>Reassigning a lead moves all leads with that phone, so a buyer has one executive.</td></tr>
+<tr><td>A11</td><td>A lead cannot be closed while it has an upcoming visit.</td></tr>
+<tr><td>A12</td><td>Buyer identity is checked with a code, simulated on screen here.</td></tr>
+<tr><td>A13</td><td>The client IP comes from <code>x-forwarded-for</code>, which Vercel overwrites. On a bare server it could be faked, though phone and account limits still hold.</td></tr>
+<tr><td>A14</td><td>Sample names beyond the three in the brief, the four staff logins and all dashboard figures are made up.</td></tr>
+<tr><td>A15</td><td>Project photos show other buildings and are labelled as samples.</td></tr>
+</table>
+
+<h2>9. What was cut and next steps</h2>
+<h3>Cut</h3>
+<ul>
+<li><strong>Out of scope in the brief:</strong> full CRM, booking payments and allotment letters, outbound voice.</li>
+<li><strong>Mocked, as the brief allows:</strong> SMS, WhatsApp and portal integrations.</li>
+<li><strong>Left out for time:</strong> trend charts (no time series is stored yet), lead export, and streaming chat replies.</li>
+</ul>
+<h3>Next steps, in order</h3>
+<ol>
+<li>Replace on-screen codes with a real SMS provider, then send WhatsApp messages through approved opt-in templates, including the RERA number on promotional messages.</li>
+<li>Add a scheduler that delivers reminders from the existing outbox.</li>
+<li>Take leads automatically from portals and ads, so the first reply goes out within the 5-minute target without staff involved. This is the change that actually moves the targets.</li>
+<li>Have native speakers review the Hindi and Gujarati, and replace the placeholders with the client's real facts, RERA numbers and photos.</li>
+<li>Move to a paid model tier sized for 3,000 leads a month, and keep running the conversation tests whenever the model or fact sheet changes.</li>
+<li>Pilot on one project and compare the three targets with the current baseline before rolling out.</li>
+</ol>
+
+</body>
+</html>
